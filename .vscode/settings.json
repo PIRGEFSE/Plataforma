@@ -1,0 +1,10 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.envFile": "${workspaceFolder}/backend/.env",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python"
+  }
+}

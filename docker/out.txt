@@ -1,0 +1,8 @@
+==================================================
+ Importando Documentos.txt
+ Archivo: /home/andres/Documentos/PIRGEFSE/Plataforma/BBDD/Documentos.txt
+==================================================
+[1/4] Creando tabla staging...
+DROP TABLE
+CREATE TABLE
+[2/4] Cargando datos con COPY streaming (puede tardar varios minutos)...

@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:16
+    container_name: pirgefse_db
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - ../BBDD:/data/bbdd:ro
+    shm_size: 1g
+    command: >
+      postgres
+        -c shared_buffers=512MB
+        -c work_mem=128MB
+        -c maintenance_work_mem=512MB
+        -c max_parallel_workers_per_gather=4
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=64MB
+        -c default_statistics_target=200
+    networks:
+      - pirgefse_net
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: pirgefse_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY: pirgefse-secret-key-2024-cambiar-en-produccion
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - pirgefse_net
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: pirgefse_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pirgefse_net
+
+  dbgate:
+    image: dbgate/dbgate:latest
+    container_name: pirgefse_dbgate
+    restart: unless-stopped
+    ports:
+      - "8081:3000"
+    volumes:
+      - dbgate_data:/root/.dbgate
+    environment:
+      CONNECTIONS: con1
+      LABEL_con1: PIRGEFSE PostgreSQL
+      SERVER_con1: db
+      PORT_con1: 5432
+      USER_con1: ${POSTGRES_USER}
+      PASSWORD_con1: ${POSTGRES_PASSWORD}
+      DATABASE_con1: ${POSTGRES_DB}
+      ENGINE_con1: postgres@dbgate-plugin-postgres
+    depends_on:
+      - db
+    networks:
+      - pirgefse_net
+
+volumes:
+  pgdata:
+    driver: local
+  dbgate_data:
+    driver: local
+
+networks:
+  pirgefse_net:
+    driver: bridge

@@ -1,0 +1,10 @@
+# Entorno virtual Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.egg-info/
+dist/
+build/
