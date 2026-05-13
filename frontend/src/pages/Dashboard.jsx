@@ -12,6 +12,7 @@ import SostenibilidadRiesgo from './tabs/SostenibilidadRiesgo'
 import RiesgoEstructural from './tabs/RiesgoEstructural'
 import Usuarios from './tabs/Usuarios'
 import FichaSostenedor from './tabs/FichaSostenedor'
+import SubvencionSostenedor from './tabs/SubvencionSostenedor'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: '📊', roles: ['admin', 'viewer'] },
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { path: '/mi-ficha/eficiencia', label: 'Eficiencia del Gasto', icon: '⚙️', roles: ['sostenedor'] },
   { path: '/mi-ficha/sostenibilidad', label: 'Sostenibilidad', icon: '🛡️', roles: ['sostenedor'] },
   { path: '/mi-ficha/riesgo', label: 'Riesgo', icon: '📊', roles: ['sostenedor'] },
+  { path: '/mi-subvencion', label: 'Subvenciones', icon: '🏫', roles: ['sostenedor'] },
 ]
 
 export default function Dashboard() {
@@ -113,6 +115,7 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/eficiencia" element={<FichaSostenedor section="eficiencia" />} />
                 <Route path="/mi-ficha/sostenibilidad" element={<FichaSostenedor section="sostenibilidad" />} />
                 <Route path="/mi-ficha/riesgo" element={<FichaSostenedor section="riesgo" />} />
+                <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
               </>
             )}
           </Routes>

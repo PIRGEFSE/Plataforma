@@ -152,6 +152,39 @@ async def subvencion(
         """))
     return [dict(r) for r in q.mappings()]
 
+# ── Distribución por Subvención — Sostenedor específico ─────────────────────
+
+@router.get("/subvencion-sostenedor")
+async def subvencion_sostenedor(
+    sost_id: int = Query(...),
+    periodo: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Distribución de subvenciones filtrada por sostenedor (usa tabla documentos)."""
+    if periodo:
+        q = await db.execute(text("""
+            SELECT subvencion_alias, SUM(monto_declarado) AS monto_total, COUNT(id) AS n_documentos
+            FROM documentos
+            WHERE sost_id = :sid
+              AND subvencion_alias IS NOT NULL AND subvencion_alias <> ''
+              AND periodo = :p
+            GROUP BY subvencion_alias
+            ORDER BY monto_total DESC
+            LIMIT 20
+        """), {"sid": sost_id, "p": periodo})
+    else:
+        q = await db.execute(text("""
+            SELECT subvencion_alias, SUM(monto_declarado) AS monto_total, COUNT(id) AS n_documentos
+            FROM documentos
+            WHERE sost_id = :sid
+              AND subvencion_alias IS NOT NULL AND subvencion_alias <> ''
+            GROUP BY subvencion_alias
+            ORDER BY monto_total DESC
+            LIMIT 20
+        """), {"sid": sost_id})
+    return [dict(r) for r in q.mappings()]
+
 # ── Top Sostenedores ────────────────────────────────────────────────────────
 
 @router.get("/sostenedores")
