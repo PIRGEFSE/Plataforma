@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
@@ -113,6 +113,19 @@ function PeriodoSelector({ periodos, value, onChange }) {
   )
 }
 
+function UnitSelector({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span style={{ color: '#64748b', fontSize: '0.82rem' }}>Unidad:</span>
+      <select className="filter-select" value={value} onChange={e => onChange(e.target.value)} style={{ minWidth: 80 }}>
+        <option value="mM">mM$</option>
+        <option value="M">M$</option>
+        <option value="$">$</option>
+      </select>
+    </div>
+  )
+}
+
 function shortName(nom, rbd) {
   if (!nom) return `RBD ${rbd}`
   return nom.length > 38 ? nom.slice(0, 36) + '…' : nom
@@ -121,6 +134,10 @@ function shortName(nom, rbd) {
 function tt() {
   return { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } }
 }
+
+// ── Contexto de formato monetario ─────────────────────────────────────────
+const MoneyFmtCtx = createContext({ fmtAmt: fmtMM, fmtAxisAmt: fmtMonedaCorto, unitLabel: 'mM$' })
+const useMoneyFmt = () => useContext(MoneyFmtCtx)
 
 const SECTION_TITLES = {
   perfil: { icon: '🏛️', label: 'Mi Ficha' },
@@ -142,6 +159,36 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   const [loadingRbd, setLoadingRbd] = useState(false)
   const [periodo, setPeriodo] = useState(2024)
   const [periodos, setPeriodos] = useState([2020, 2021, 2022, 2023, 2024])
+  const [unitMode, setUnitMode] = useState('mM')
+
+  // Funciones de formato monetario según unidad seleccionada
+  const _base = fmtMM
+  const _axis = fmtMonedaCorto
+  const fmtAmt = (v) => {
+    const n = Number(v) || 0
+    if (unitMode === 'mM') return _base(n)
+    if (unitMode === 'M') {
+      const m = n / 1000
+      const s = m < 0 ? '−' : ''
+      return `${s}${Math.abs(m).toLocaleString('es-CL', { maximumFractionDigits: 1 })} M$`
+    }
+    const s = n < 0 ? '−' : ''
+    return `${s}$${Math.abs(Math.round(n)).toLocaleString('es-CL')}`
+  }
+  const fmtAxisAmt = (v) => {
+    const n = Number(v) || 0
+    if (unitMode === 'mM') return _axis(n)
+    if (unitMode === 'M') {
+      const m = n / 1000
+      return Math.abs(m) >= 1000 ? `${(m / 1000).toFixed(1)}MM$` : `${m.toFixed(0)}M$`
+    }
+    const a = Math.abs(n)
+    if (a >= 1e9) return `${(n / 1e9).toFixed(1)}B`
+    if (a >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+    if (a >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+    return `$${Math.round(n).toLocaleString('es-CL')}`
+  }
+  const unitLabel = unitMode === 'mM' ? 'mM$' : unitMode === 'M' ? 'M$' : '$'
 
   const sostId = user?.sost_id || 69110400
   const perfilFetched = useRef(false)
@@ -196,9 +243,10 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   )
 
   return (
+    <MoneyFmtCtx.Provider value={{ fmtAmt, fmtAxisAmt, unitLabel }}>
     <div className="tab-page">
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="tab-header">
+      <div className="tab-header" style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#0b1120', boxShadow: '0 2px 12px rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
         <div>
           <h2 className="tab-title">{sec.icon} {perfil.nombre_sost}</h2>
           <p className="tab-subtitle">
@@ -207,6 +255,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+          <UnitSelector value={unitMode} onChange={setUnitMode} />
           <span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: '#1e40af22', color: '#60a5fa', border: '1px solid #1e40af', fontSize: '0.78rem', fontWeight: 600 }}>
             🏛️ Municipal DAEM
           </span>
@@ -243,11 +292,13 @@ export default function FichaSostenedor({ section = 'perfil' }) {
           </>
       )}
     </div>
+    </MoneyFmtCtx.Provider>
   )
 }
 
 // ── Tab: Perfil ───────────────────────────────────────────────────────────────
 function TabPerfil({ perfil, establecimientos, financiero_rbd = [], loadingRbd }) {
+  const { fmtAmt, fmtAxisAmt } = useMoneyFmt()
   const [searchTerm, setSearchTerm] = useState('')
   const [ensFilter, setEnsFilter] = useState('')
   const [ruralFilter, setRuralFilter] = useState('all')
@@ -381,11 +432,11 @@ function TabPerfil({ perfil, establecimientos, financiero_rbd = [], loadingRbd }
                       <span style={{ fontSize: '0.72rem', fontWeight: 600, color, background: `${color}22`, border: `1px solid ${color}`, borderRadius: 999, padding: '0.15rem 0.5rem' }}>{estado}</span>
                     </td>
                     <td style={{ padding: '0.5rem 0.9rem', color: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.mat_total)}</td>
-                    <td style={{ padding: '0.5rem 0.9rem', color: '#10b981', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{ingreso != null ? fmtMM(ingreso) : <span style={{ color: '#334155' }}>—</span>}</td>
-                    <td style={{ padding: '0.5rem 0.9rem', color: '#ef4444', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{gasto != null ? fmtMM(gasto) : <span style={{ color: '#334155' }}>—</span>}</td>
+                    <td style={{ padding: '0.5rem 0.9rem', color: '#10b981', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{ingreso != null ? fmtAmt(ingreso) : <span style={{ color: '#334155' }}>—</span>}</td>
+                    <td style={{ padding: '0.5rem 0.9rem', color: '#ef4444', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{gasto != null ? fmtAmt(gasto) : <span style={{ color: '#334155' }}>—</span>}</td>
                     <td style={{ padding: '0.5rem 0.9rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {superav != null
-                        ? <strong style={{ color: superav >= 0 ? '#10b981' : '#ef4444' }}>{fmtMM(superav)}</strong>
+                        ? <strong style={{ color: superav >= 0 ? '#10b981' : '#ef4444' }}>{fmtAmt(superav)}</strong>
                         : <span style={{ color: '#334155' }}>—</span>}
                     </td>
                     <td style={{ padding: '0.5rem 0.6rem' }}>{getEnsenanzas(ee)}</td>
@@ -430,27 +481,41 @@ function TabPerfil({ perfil, establecimientos, financiero_rbd = [], loadingRbd }
 // ── Tab: Financiero por RBD ────────────────────────────────────────────────────
 function TabFinanciero({ rdbData, periodo }) {
   if (!rdbData) return null
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
   const { financiero_rbd = [], remuneraciones_rbd = [] } = rdbData
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+
   const sorted = [...financiero_rbd].sort((a, b) => Number(b.ingreso) - Number(a.ingreso))
-  const names = sorted.map(d => shortName(d.nom_rbd, d.rbd))
-  const h = Math.max(500, sorted.length * 26)
+
+  // Filtrado por nombre y paginado de 10 en 10
+  const filterText = search.toLowerCase().trim()
+  const filtered = filterText ? sorted.filter(d => (d.nom_rbd ?? '').toLowerCase().includes(filterText)) : sorted
+  const totalPages = Math.ceil(filtered.length / 10) || 1
+  const safePage = Math.min(page, totalPages - 1)
+  const visible = filtered.slice(safePage * 10, (safePage + 1) * 10)
+  const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(320, visible.length * 36)
+
+  // Resetear página al cambiar búsqueda
+  useEffect(() => { setPage(0) }, [search])
 
   const barOption = {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...tt(),
       formatter: params => {
-        const d = sorted[params[0].dataIndex]
+        const d = visible[params[0].dataIndex]
         return `<b>${shortName(d.nom_rbd, d.rbd)}</b> (${d.rbd})<br/>
-          📈 Ingreso: ${fmtMM(d.ingreso)}<br/>📉 Gasto: ${fmtMM(d.gasto)}<br/>⚖️ Superávit: <b>${fmtMM(d.superavit)}</b>`
+          📈 Ingreso: ${fmtAmt(d.ingreso)}<br/>📉 Gasto: ${fmtAmt(d.gasto)}<br/>⚖️ Superávit: <b>${fmtAmt(d.superavit)}</b>`
       },
     },
     legend: { data: ['Ingreso', 'Gasto'], textStyle: { color: '#94a3b8' }, top: 0 },
     grid: { left: 260, right: 100, top: 40, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: names, axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [
-      { name: 'Ingreso', type: 'bar', data: sorted.map(d => Number(d.ingreso)), barMaxWidth: 16, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } },
-      { name: 'Gasto', type: 'bar', data: sorted.map(d => Number(d.gasto)), barMaxWidth: 16, itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } },
+      { name: 'Ingreso', type: 'bar', data: visible.map(d => Number(d.ingreso)), barMaxWidth: 16, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } },
+      { name: 'Gasto',   type: 'bar', data: visible.map(d => Number(d.gasto)),   barMaxWidth: 16, itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } },
     ],
     backgroundColor: 'transparent',
   }
@@ -459,17 +524,17 @@ function TabFinanciero({ rdbData, periodo }) {
     tooltip: {
       trigger: 'axis', ...tt(),
       formatter: params => {
-        const d = sorted[params[0].dataIndex]
+        const d = visible[params[0].dataIndex]
         const v = Number(d.superavit)
-        return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Superávit: <b style="color:${v >= 0 ? '#10b981' : '#ef4444'}">${fmtMM(v)}</b>`
+        return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Superávit: <b style="color:${v >= 0 ? '#10b981' : '#ef4444'}">${fmtAmt(v)}</b>`
       },
     },
     grid: { left: 260, right: 100, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: names, axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 16,
-      data: sorted.map(d => ({ value: Number(d.superavit), itemStyle: { color: Number(d.superavit) >= 0 ? '#10b981' : '#ef4444', borderRadius: [0, 4, 4, 0] } })),
+      data: visible.map(d => ({ value: Number(d.superavit), itemStyle: { color: Number(d.superavit) >= 0 ? '#10b981' : '#ef4444', borderRadius: [0, 4, 4, 0] } })),
       markLine: { silent: true, data: [{ xAxis: 0, lineStyle: { color: '#475569', type: 'dashed' } }] },
     }],
     backgroundColor: 'transparent',
@@ -481,16 +546,16 @@ function TabFinanciero({ rdbData, periodo }) {
       trigger: 'axis', ...tt(),
       formatter: params => {
         const d = remTop[params[0].dataIndex]
-        return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Total líq.: ${fmtMM(d.total_liquido)}<br/>Prom.: $${fmtN(d.promedio_liquido)}`
+        return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Total líq.: ${fmtAmt(d.total_liquido)}<br/>Prom.: $${fmtN(d.promedio_liquido)}`
       }
     },
     grid: { left: 260, right: 100, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: remTop.map(d => shortName(d.nom_rbd, d.rbd)), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 16, data: remTop.map(d => Number(d.total_liquido)),
       itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] },
-      label: { show: true, position: 'right', formatter: p => fmtMM(p.value), fontSize: 9, color: '#fde68a' },
+      label: { show: true, position: 'right', formatter: p => fmtAmt(p.value), fontSize: 9, color: '#fde68a' },
     }],
     backgroundColor: 'transparent',
   }
@@ -499,27 +564,93 @@ function TabFinanciero({ rdbData, periodo }) {
   const totalGas = sorted.reduce((s, d) => s + Number(d.gasto), 0)
   const conDeficit = sorted.filter(d => Number(d.superavit) < 0).length
 
+  const inputStyle = {
+    padding: '0.35rem 0.75rem', backgroundColor: '#0f172a', color: '#f1f5f9',
+    border: '1px solid #334155', borderRadius: '0.375rem', fontSize: '0.8rem', minWidth: 220,
+  }
+
   return (
     <>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-        <KPICard icon="📈" label={`Total Ingresos (${periodo})`} value={fmtMM(totalIng)} color="#10b981" />
-        <KPICard icon="📉" label={`Total Gastos (${periodo})`} value={fmtMM(totalGas)} color="#ef4444" />
-        <KPICard icon="⚖️" label="Superávit Consolidado" value={fmtMM(totalIng - totalGas)} color="#6366f1" />
+        <KPICard icon="📈" label={`Total Ingresos (${periodo})`} value={fmtAmt(totalIng)} color="#10b981" />
+        <KPICard icon="📉" label={`Total Gastos (${periodo})`} value={fmtAmt(totalGas)} color="#ef4444" />
+        <KPICard icon="⚖️" label="Superávit Consolidado" value={fmtAmt(totalIng - totalGas)} color="#6366f1" />
         <KPICard icon="⚠️" label="EE con Déficit" value={fmtN(conDeficit)} color={conDeficit > 0 ? '#f59e0b' : '#10b981'} />
       </div>
+
+      {/* Buscador + paginación */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="🔍 Buscar por nombre de establecimiento..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={inputStyle}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            style={{ padding: '0.3rem 0.6rem', background: '#1e293b', border: '1px solid #334155', color: '#94a3b8', borderRadius: '0.375rem', cursor: 'pointer', fontSize: '0.78rem' }}
+          >
+            ✕ Limpiar
+          </button>
+        )}
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Mostrando{' '}
+          <b style={{ color: '#94a3b8' }}>{filtered.length === 0 ? 0 : safePage * 10 + 1}–{Math.min((safePage + 1) * 10, filtered.length)}</b>
+          {' '}de <b style={{ color: '#94a3b8' }}>{filtered.length}</b> establecimientos
+        </span>
+        {/* Botones Anterior / Siguiente alineados a la derecha */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            disabled={safePage === 0}
+            onClick={() => setPage(p => p - 1)}
+            style={{
+              padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem',
+              background: safePage === 0 ? '#0f172a' : '#1e293b',
+              color: safePage === 0 ? '#475569' : '#e2e8f0',
+              cursor: safePage === 0 ? 'not-allowed' : 'pointer', fontSize: '0.8rem',
+            }}
+          >
+            ← Anterior
+          </button>
+          <span style={{ color: '#64748b', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>
+            {safePage + 1} / {totalPages}
+          </span>
+          <button
+            disabled={safePage >= totalPages - 1}
+            onClick={() => setPage(p => p + 1)}
+            style={{
+              padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem',
+              background: safePage >= totalPages - 1 ? '#0f172a' : '#1e293b',
+              color: safePage >= totalPages - 1 ? '#475569' : '#e2e8f0',
+              cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer', fontSize: '0.8rem',
+            }}
+          >
+            Siguiente →
+          </button>
+        </div>
+      </div>
+
       <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Ingreso vs Gasto por Establecimiento — {periodo} (mM$)</h3>
-        <ReactECharts option={barOption} style={{ height: h }} theme="dark" />
+        <h3 className="chart-title">Ingreso vs Gasto por Establecimiento — {periodo} ({unitLabel})</h3>
+        {visible.length === 0
+          ? <p style={{ color: '#64748b', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
+          : <ReactECharts option={barOption} style={{ height: h }} theme="dark" />
+        }
       </div>
       <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Superávit / Déficit por Establecimiento — {periodo} (mM$)</h3>
+        <h3 className="chart-title">Superávit / Déficit por Establecimiento — {periodo} ({unitLabel})</h3>
         <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
           <span style={{ color: '#10b981' }}>■</span> Superávit &nbsp;<span style={{ color: '#ef4444' }}>■</span> Déficit
         </p>
-        <ReactECharts option={superavitOption} style={{ height: h }} theme="dark" />
+        {visible.length === 0
+          ? <p style={{ color: '#64748b', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
+          : <ReactECharts option={superavitOption} style={{ height: h }} theme="dark" />
+        }
       </div>
       <div className="chart-card">
-        <h3 className="chart-title">Top 15 — Remuneraciones Líquidas por Establecimiento — {periodo} (mM$)</h3>
+        <h3 className="chart-title">Top 15 — Remuneraciones Líquidas por Establecimiento — {periodo} ({unitLabel})</h3>
         <ReactECharts option={remOption} style={{ height: 440 }} theme="dark" />
       </div>
     </>
@@ -529,22 +660,31 @@ function TabFinanciero({ rdbData, periodo }) {
 // ── Tab: Eficiencia del Gasto por RBD ─────────────────────────────────────────
 function TabEficiencia({ rdbData, periodo }) {
   if (!rdbData) return null
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
   const { eficiencia_rbd = [] } = rdbData
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
   const sorted = [...eficiencia_rbd].sort((a, b) => Number(b.total_gasto) - Number(a.total_gasto))
-  const names = sorted.map(d => shortName(d.nom_rbd, d.rbd))
-  const h = Math.max(500, sorted.length * 26)
+  const filterText = search.toLowerCase().trim()
+  const filtered = filterText ? sorted.filter(d => (d.nom_rbd ?? '').toLowerCase().includes(filterText)) : sorted
+  const totalPages = Math.ceil(filtered.length / 10) || 1
+  const safePage = Math.min(page, totalPages - 1)
+  const visible = filtered.slice(safePage * 10, (safePage + 1) * 10)
+  const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(320, visible.length * 36)
+  useEffect(() => { setPage(0) }, [search])
 
   const pct100Option = {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...tt(),
       formatter: params => {
-        const d = sorted[params[0].dataIndex]
+        const d = visible[params[0].dataIndex]
         const ef = EF_COLORS[d.nivel_eficiencia] ?? '#94a3b8'
         return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>
           <span style="color:#10b981">■</span> Aula: ${d.pct_aula}%<br/>
           <span style="color:#ef4444">■</span> Admin: <b style="color:${ef}">${d.pct_admin}%</b> — ${d.nivel_eficiencia}<br/>
           <span style="color:#f59e0b">■</span> Otros: ${d.pct_otros}%<br/>
-          Total: ${fmtMM(d.total_gasto)}`
+          Total: ${fmtAmt(d.total_gasto)}`
       },
     },
     legend: { data: ['Gasto en Aula', 'Gasto Administrativo', 'Otros Gastos'], textStyle: { color: '#94a3b8' }, top: 0 },
@@ -552,9 +692,9 @@ function TabEficiencia({ rdbData, periodo }) {
     xAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: v => `${v}%` }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: names, axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [
-      { name: 'Gasto en Aula', type: 'bar', stack: 'pct', barMaxWidth: 16, data: sorted.map(d => d.pct_aula), itemStyle: { color: '#10b981' } },
-      { name: 'Gasto Administrativo', type: 'bar', stack: 'pct', barMaxWidth: 16, data: sorted.map(d => d.pct_admin), itemStyle: { color: '#ef4444' } },
-      { name: 'Otros Gastos', type: 'bar', stack: 'pct', barMaxWidth: 16, data: sorted.map(d => d.pct_otros), itemStyle: { color: '#f59e0b' } },
+      { name: 'Gasto en Aula', type: 'bar', stack: 'pct', barMaxWidth: 16, data: visible.map(d => d.pct_aula), itemStyle: { color: '#10b981' } },
+      { name: 'Gasto Administrativo', type: 'bar', stack: 'pct', barMaxWidth: 16, data: visible.map(d => d.pct_admin), itemStyle: { color: '#ef4444' } },
+      { name: 'Otros Gastos', type: 'bar', stack: 'pct', barMaxWidth: 16, data: visible.map(d => d.pct_otros), itemStyle: { color: '#f59e0b' } },
     ],
     backgroundColor: 'transparent',
   }
@@ -562,14 +702,14 @@ function TabEficiencia({ rdbData, periodo }) {
   const adminOption = {
     tooltip: {
       trigger: 'axis', ...tt(),
-      formatter: params => { const d = sorted[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>% Administrativo: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}` }
+      formatter: params => { const d = visible[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>% Administrativo: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}` }
     },
     grid: { left: 260, right: 80, top: 20, bottom: 20 },
     xAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: v => `${v}%` }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: names, axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 16,
-      data: sorted.map(d => ({ value: d.pct_admin, itemStyle: { color: EF_COLORS[d.nivel_eficiencia] ?? '#94a3b8', borderRadius: [0, 4, 4, 0] } })),
+      data: visible.map(d => ({ value: d.pct_admin, itemStyle: { color: EF_COLORS[d.nivel_eficiencia] ?? '#94a3b8', borderRadius: [0, 4, 4, 0] } })),
       markLine: {
         silent: true, data: [
           { xAxis: 15, lineStyle: { color: '#10b981', type: 'dashed' }, label: { formatter: '15%', color: '#10b981', fontSize: 10 } },
@@ -583,6 +723,8 @@ function TabEficiencia({ rdbData, periodo }) {
   const prom = sorted.length > 0 ? sorted.reduce((s, d) => s + d.pct_admin, 0) / sorted.length : 0
   const optim = sorted.filter(d => d.nivel_eficiencia === 'Optimo').length
   const elev = sorted.filter(d => d.nivel_eficiencia === 'Elevado').length
+  const pgBtn = (dis) => ({ padding:'0.3rem 0.75rem', border:'1px solid #334155', borderRadius:'0.375rem', background: dis?'#0f172a':'#1e293b', color: dis?'#475569':'#e2e8f0', cursor: dis?'not-allowed':'pointer', fontSize:'0.8rem' })
+  const inpSt = { padding:'0.35rem 0.75rem', backgroundColor:'#0f172a', color:'#f1f5f9', border:'1px solid #334155', borderRadius:'0.375rem', fontSize:'0.8rem', minWidth:220 }
 
   return (
     <>
@@ -591,6 +733,16 @@ function TabEficiencia({ rdbData, periodo }) {
         <KPICard icon="🟢" label="EE Óptimos (≤15%)" value={fmtN(optim)} color="#10b981" />
         <KPICard icon="🔴" label="EE Elevados (>25%)" value={fmtN(elev)} color="#ef4444" />
         <KPICard icon="⚙️" label="EE Moderados" value={fmtN(sorted.length - optim - elev)} color="#f59e0b" />
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem', flexWrap:'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={inpSt} />
+        {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
+        <span style={{ fontSize:'0.78rem', color:'#64748b' }}>Mostrando <b style={{ color:'#94a3b8' }}>{filtered.length===0?0:safePage*10+1}–{Math.min((safePage+1)*10,filtered.length)}</b> de <b style={{ color:'#94a3b8' }}>{filtered.length}</b> establecimientos</span>
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
+          <button disabled={safePage===0} onClick={() => setPage(p=>p-1)} style={pgBtn(safePage===0)}>← Anterior</button>
+          <span style={{ color:'#64748b', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{safePage+1} / {totalPages}</span>
+          <button disabled={safePage>=totalPages-1} onClick={() => setPage(p=>p+1)} style={pgBtn(safePage>=totalPages-1)}>Siguiente →</button>
+        </div>
       </div>
       <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
         <h3 className="chart-title">Distribución del Gasto por Categoría (%) — {periodo}</h3>
@@ -613,7 +765,10 @@ function TabEficiencia({ rdbData, periodo }) {
 // ── Tab: Sostenibilidad ────────────────────────────────────────────────────────
 function TabSostenibilidad({ rdbData, periodo }) {
   if (!rdbData) return null
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
   const { financiero_rbd = [], remuneraciones_rbd = [] } = rdbData
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
 
   const merged = financiero_rbd.map(f => {
     const rem = remuneraciones_rbd.find(r => r.rbd === f.rbd)
@@ -627,16 +782,22 @@ function TabSostenibilidad({ rdbData, periodo }) {
     }
   }).filter(d => d.ingreso > 0).sort((a, b) => (b.ratio ?? -1) - (a.ratio ?? -1))
 
-  const h = Math.max(500, merged.length * 26)
-  const names = merged.map(d => shortName(d.nom_rbd, d.rbd))
+  const filterText = search.toLowerCase().trim()
+  const filtered = filterText ? merged.filter(d => (d.nom_rbd ?? '').toLowerCase().includes(filterText)) : merged
+  const totalPages = Math.ceil(filtered.length / 10) || 1
+  const safePage = Math.min(page, totalPages - 1)
+  const visible = filtered.slice(safePage * 10, (safePage + 1) * 10)
+  const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(320, visible.length * 36)
+  useEffect(() => { setPage(0) }, [search])
 
   const ratioOption = {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...tt(),
       formatter: params => {
-        const d = merged[params[0].dataIndex]
+        const d = visible[params[0].dataIndex]
         return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>
-          Remuneraciones: ${fmtMM(d.total_liq)}<br/>Ingresos: ${fmtMM(d.ingreso)}<br/>
+          Remuneraciones: ${fmtAmt(d.total_liq)}<br/>Ingresos: ${fmtAmt(d.ingreso)}<br/>
           Ratio: <b>${d.ratio != null ? d.ratio + '%' : 'N/D'}</b> — ${d.nivel_ratio}`
       }
     },
@@ -645,7 +806,7 @@ function TabSostenibilidad({ rdbData, periodo }) {
     yAxis: { type: 'category', data: names, axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 16,
-      data: merged.map(d => ({ value: d.ratio, itemStyle: { color: d.nivel_ratio === 'Crítico' ? '#ef4444' : d.nivel_ratio === 'Moderado' ? '#f59e0b' : '#10b981', borderRadius: [0, 4, 4, 0] } })),
+      data: visible.map(d => ({ value: d.ratio, itemStyle: { color: d.nivel_ratio === 'Crítico' ? '#ef4444' : d.nivel_ratio === 'Moderado' ? '#f59e0b' : '#10b981', borderRadius: [0, 4, 4, 0] } })),
       markLine: {
         silent: true, data: [
           { xAxis: 50, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: '50%', color: '#f59e0b', fontSize: 10 } },
@@ -659,11 +820,11 @@ function TabSostenibilidad({ rdbData, periodo }) {
   const scatterOption = {
     tooltip: {
       trigger: 'item', ...tt(),
-      formatter: p => { const d = merged[p.dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Ingresos: ${fmtMM(d.ingreso)}<br/>Ratio: ${d.ratio ?? 'N/D'}%` }
+      formatter: p => { const d = merged[p.dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Ingresos: ${fmtAmt(d.ingreso)}<br/>Ratio: ${d.ratio ?? 'N/D'}%` }
     },
     grid: { left: 80, right: 20, top: 20, bottom: 40 },
     xAxis: { name: 'Funcionarios', type: 'value', axisLabel: { color: '#94a3b8' }, splitLine: { lineStyle: { color: '#1e293b' } } },
-    yAxis: { name: 'Ingresos (mM$)', type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { name: `Ingresos (${unitLabel})`, type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     series: [{ type: 'scatter', data: merged.map(d => [d.funcionarios, d.ingreso]), symbolSize: 10, itemStyle: { color: '#8b5cf6', opacity: 0.8 } }],
     backgroundColor: 'transparent',
   }
@@ -673,6 +834,9 @@ function TabSostenibilidad({ rdbData, periodo }) {
   const saludables = merged.filter(d => d.nivel_ratio === 'Saludable').length
   const promRatio = merged.filter(d => d.ratio != null).reduce((s, d) => s + d.ratio, 0) / (merged.filter(d => d.ratio != null).length || 1)
 
+  const pgBtnS = (dis) => ({ padding:'0.3rem 0.75rem', border:'1px solid #334155', borderRadius:'0.375rem', background: dis?'#0f172a':'#1e293b', color: dis?'#475569':'#e2e8f0', cursor: dis?'not-allowed':'pointer', fontSize:'0.8rem' })
+  const inpStS = { padding:'0.35rem 0.75rem', backgroundColor:'#0f172a', color:'#f1f5f9', border:'1px solid #334155', borderRadius:'0.375rem', fontSize:'0.8rem', minWidth:220 }
+
   return (
     <>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
@@ -681,12 +845,22 @@ function TabSostenibilidad({ rdbData, periodo }) {
         <KPICard icon="🟡" label="EE Moderados (50–70%)" value={fmtN(moderados)} color="#f59e0b" />
         <KPICard icon="🔴" label="EE Críticos (>70%)" value={fmtN(criticos)} color="#ef4444" />
       </div>
+      <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem', flexWrap:'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={inpStS} />
+        {search && <button onClick={() => setSearch('')} style={pgBtnS(false)}>✕ Limpiar</button>}
+        <span style={{ fontSize:'0.78rem', color:'#64748b' }}>Mostrando <b style={{ color:'#94a3b8' }}>{filtered.length===0?0:safePage*10+1}–{Math.min((safePage+1)*10,filtered.length)}</b> de <b style={{ color:'#94a3b8' }}>{filtered.length}</b> establecimientos</span>
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
+          <button disabled={safePage===0} onClick={() => setPage(p=>p-1)} style={pgBtnS(safePage===0)}>← Anterior</button>
+          <span style={{ color:'#64748b', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{safePage+1} / {totalPages}</span>
+          <button disabled={safePage>=totalPages-1} onClick={() => setPage(p=>p+1)} style={pgBtnS(safePage>=totalPages-1)}>Siguiente →</button>
+        </div>
+      </div>
       <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
         <h3 className="chart-title">Ratio Remuneraciones / Ingresos por Establecimiento (%) — {periodo}</h3>
         <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
           <span style={{ color: '#10b981' }}>■</span> Saludable &lt;50% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado 50–70% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Crítico &gt;70%
         </p>
-        <ReactECharts option={ratioOption} style={{ height: h }} theme="dark" />
+        {visible.length===0 ? <p style={{ color:'#64748b', padding:'2rem', textAlign:'center' }}>Sin resultados para «{search}»</p> : <ReactECharts option={ratioOption} style={{ height: h }} theme="dark" />}
       </div>
       <div className="chart-card">
         <h3 className="chart-title">Funcionarios vs Ingresos por Establecimiento — {periodo}</h3>
@@ -701,29 +875,41 @@ function TabRiesgo({ rdbData, periodo }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [riesgoFilter, setRiesgoFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [chartPage, setChartPage] = useState(0)
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
     setCurrentPage(1)
     setSearchTerm('')
     setRiesgoFilter('all')
+    setChartPage(0)
   }, [rdbData, periodo])
+
+  useEffect(() => { setChartPage(0) }, [searchTerm])
 
   if (!rdbData) return null
   const { acreditacion_rbd = [] } = rdbData
   const sorted = [...acreditacion_rbd].sort((a, b) => Number(a.pct_rendido) - Number(b.pct_rendido))
-  const h = Math.max(500, sorted.length * 26)
-  const names = sorted.map(d => shortName(d.nom_rbd, d.rbd))
+
+  // Chart-level filter + pagination using searchTerm
+  const chartFilterText = searchTerm.toLowerCase()
+  const chartFiltered = chartFilterText ? sorted.filter(d => (d.nom_rbd ?? '').toLowerCase().includes(chartFilterText)) : sorted
+  const chartTotalPages = Math.ceil(chartFiltered.length / 10) || 1
+  const chartSafePage = Math.min(chartPage, chartTotalPages - 1)
+  const chartVisible = chartFiltered.slice(chartSafePage * 10, (chartSafePage + 1) * 10)
+  const names = chartVisible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(320, chartVisible.length * 36)
 
   const acredOption = {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...tt(),
       formatter: params => {
-        const d = sorted[params[0].dataIndex]
+        const d = chartVisible[params[0].dataIndex]
         return `<b>${d.nom_rbd ?? `RBD ${d.rbd}`}</b> (${d.rbd})<br/>
-          ✅ Rendido: ${Number(d.pct_rendido).toFixed(1)}% (${fmtMM(d.monto_rendido)})<br/>
-          ❌ No rendido: ${Number(d.pct_no_rendido).toFixed(1)}% (${fmtMM(d.monto_no_rendido)})<br/>
-          Total: ${fmtMM(d.monto_total)} — <b>${d.nivel_riesgo}</b>`
+          ✅ Rendido: ${Number(d.pct_rendido).toFixed(1)}% (${fmtAmt(d.monto_rendido)})<br/>
+          ❌ No rendido: ${Number(d.pct_no_rendido).toFixed(1)}% (${fmtAmt(d.monto_no_rendido)})<br/>
+          Total: ${fmtAmt(d.monto_total)} — <b>${d.nivel_riesgo}</b>`
       }
     },
     legend: { data: ['% Rendido', '% No Rendido'], textStyle: { color: '#94a3b8' }, top: 0 },
@@ -733,11 +919,11 @@ function TabRiesgo({ rdbData, periodo }) {
     series: [
       {
         name: '% Rendido', type: 'bar', stack: 'pct', barMaxWidth: 16,
-        data: sorted.map(d => ({ value: Number(d.pct_rendido), itemStyle: { color: RIESGO_COLORS[d.nivel_riesgo] ?? '#10b981' } }))
+        data: chartVisible.map(d => ({ value: Number(d.pct_rendido), itemStyle: { color: RIESGO_COLORS[d.nivel_riesgo] ?? '#10b981' } }))
       },
       {
         name: '% No Rendido', type: 'bar', stack: 'pct', barMaxWidth: 16,
-        data: sorted.map(d => Number(d.pct_no_rendido)), itemStyle: { color: '#1e293b' }
+        data: chartVisible.map(d => Number(d.pct_no_rendido)), itemStyle: { color: '#1e293b' }
       },
     ],
     backgroundColor: 'transparent',
@@ -747,14 +933,14 @@ function TabRiesgo({ rdbData, periodo }) {
     .sort((a, b) => Number(b.monto_no_rendido) - Number(a.monto_no_rendido)).slice(0, 20)
 
   const montoOpt = topProb.length > 0 ? {
-    tooltip: { trigger: 'axis', ...tt(), formatter: params => { const d = topProb[params[0].dataIndex]; return `<b>${d.nom_rbd ?? `RBD ${d.rbd}`}</b><br/>No rendido: <b style="color:#ef4444">${fmtMM(d.monto_no_rendido)}</b>` } },
+    tooltip: { trigger: 'axis', ...tt(), formatter: params => { const d = topProb[params[0].dataIndex]; return `<b>${d.nom_rbd ?? `RBD ${d.rbd}`}</b><br/>No rendido: <b style="color:#ef4444">${fmtAmt(d.monto_no_rendido)}</b>` } },
     grid: { left: 260, right: 100, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     yAxis: { type: 'category', data: topProb.map(d => shortName(d.nom_rbd, d.rbd)), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 16,
       data: topProb.map(d => ({ value: Number(d.monto_no_rendido), itemStyle: { color: RIESGO_COLORS[d.nivel_riesgo] ?? '#ef4444', borderRadius: [0, 4, 4, 0] } })),
-      label: { show: true, position: 'right', formatter: p => fmtMM(p.value), fontSize: 9 },
+      label: { show: true, position: 'right', formatter: p => fmtAmt(p.value), fontSize: 9 },
     }],
     backgroundColor: 'transparent',
   } : null
@@ -788,19 +974,25 @@ function TabRiesgo({ rdbData, periodo }) {
         <KPICard icon="✅" label="EE Riesgo Bajo" value={fmtN(bajos)} color="#10b981" sub="≥90% rendido" />
         <KPICard icon="🟡" label="EE Riesgo Moderado" value={fmtN(moderados)} color="#f59e0b" sub="70–90% rendido" />
         <KPICard icon="🔴" label="EE Riesgo Alto" value={fmtN(altos)} color="#ef4444" sub="<70% rendido" />
-        <KPICard icon="💸" label="Total No Rendido" value={fmtMM(totalNR)} color={totalNR > 0 ? '#ef4444' : '#10b981'}
+        <KPICard icon="💸" label="Total No Rendido" value={fmtAmt(totalNR)} color={totalNR > 0 ? '#ef4444' : '#10b981'}
           sub={peorEE ? `Más bajo: ${shortName(peorEE.nom_rbd, peorEE.rbd)} (${Number(peorEE.pct_rendido).toFixed(0)}%)` : ''} />
       </div>
       <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
         <h3 className="chart-title">Acreditación de Saldos por Establecimiento (%) — {periodo}</h3>
-        <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          Ordenado por % rendido ascendente. <span style={{ color: '#10b981' }}>■</span> Rendido &nbsp;<span style={{ color: '#1e293b' }}>■</span> No rendido
-        </p>
-        <ReactECharts option={acredOption} style={{ height: h }} theme="dark" />
+        <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.75rem', flexWrap:'wrap' }}>
+          <span style={{ fontSize:'0.78rem', color:'#64748b' }}>Ordenado por % rendido ascendente. <span style={{ color:'#10b981' }}>■</span> Rendido &nbsp;<span style={{ color:'#1e293b', border:'1px solid #334155', display:'inline-block', width:10, height:10, verticalAlign:'middle' }}></span> No rendido</span>
+          <span style={{ fontSize:'0.78rem', color:'#64748b' }}>Mostrando <b style={{ color:'#94a3b8' }}>{chartFiltered.length===0?0:chartSafePage*10+1}–{Math.min((chartSafePage+1)*10,chartFiltered.length)}</b> de <b style={{ color:'#94a3b8' }}>{chartFiltered.length}</b></span>
+          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
+            <button disabled={chartSafePage===0} onClick={() => setChartPage(p=>p-1)} style={{ padding:'0.3rem 0.6rem', border:'1px solid #334155', borderRadius:'0.375rem', background: chartSafePage===0?'#0f172a':'#1e293b', color: chartSafePage===0?'#475569':'#e2e8f0', cursor: chartSafePage===0?'not-allowed':'pointer', fontSize:'0.78rem' }}>← Anterior</button>
+            <span style={{ color:'#64748b', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{chartSafePage+1} / {chartTotalPages}</span>
+            <button disabled={chartSafePage>=chartTotalPages-1} onClick={() => setChartPage(p=>p+1)} style={{ padding:'0.3rem 0.6rem', border:'1px solid #334155', borderRadius:'0.375rem', background: chartSafePage>=chartTotalPages-1?'#0f172a':'#1e293b', color: chartSafePage>=chartTotalPages-1?'#475569':'#e2e8f0', cursor: chartSafePage>=chartTotalPages-1?'not-allowed':'pointer', fontSize:'0.78rem' }}>Siguiente →</button>
+          </div>
+        </div>
+        {chartVisible.length===0 ? <p style={{ color:'#64748b', padding:'2rem', textAlign:'center' }}>Sin resultados para «{searchTerm}»</p> : <ReactECharts option={acredOption} style={{ height: h }} theme="dark" />}
       </div>
       {montoOpt && (
         <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-          <h3 className="chart-title">Top 20 — Monto No Rendido por Establecimiento (mM$) — {periodo}</h3>
+          <h3 className="chart-title">Top 20 — Monto No Rendido por Establecimiento ({unitLabel}) — {periodo}</h3>
           <ReactECharts option={montoOpt} style={{ height: 520 }} theme="dark" />
         </div>
       )}
@@ -830,9 +1022,9 @@ function TabRiesgo({ rdbData, periodo }) {
                     <td style={{ fontFamily: 'monospace', color: '#94a3b8', fontSize: '0.78rem' }}>{d.rbd}</td>
                     <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.nom_rbd ?? `RBD ${d.rbd}`}</td>
                     <td>{fmtN(d.total_docs)}</td>
-                    <td style={{ color: '#6366f1' }}>{fmtMM(d.monto_total)}</td>
-                    <td style={{ color: '#10b981' }}>{fmtMM(d.monto_rendido)}</td>
-                    <td style={{ color: Number(d.monto_no_rendido) > 0 ? '#ef4444' : '#10b981' }}>{fmtMM(d.monto_no_rendido)}</td>
+                    <td style={{ color: '#6366f1' }}>{fmtAmt(d.monto_total)}</td>
+                    <td style={{ color: '#10b981' }}>{fmtAmt(d.monto_rendido)}</td>
+                    <td style={{ color: Number(d.monto_no_rendido) > 0 ? '#ef4444' : '#10b981' }}>{fmtAmt(d.monto_no_rendido)}</td>
                     <td><strong style={{ color: c }}>{Number(d.pct_rendido).toFixed(1)}%</strong></td>
                     <td><span style={{ color: c, fontWeight: 600, fontSize: '0.72rem', background: `${c}22`, border: `1px solid ${c}`, borderRadius: 999, padding: '0.15rem 0.5rem' }}>{d.nivel_riesgo}</span></td>
                   </tr>

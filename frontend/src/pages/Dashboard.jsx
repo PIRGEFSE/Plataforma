@@ -13,6 +13,7 @@ import RiesgoEstructural from './tabs/RiesgoEstructural'
 import Usuarios from './tabs/Usuarios'
 import FichaSostenedor from './tabs/FichaSostenedor'
 import SubvencionSostenedor from './tabs/SubvencionSostenedor'
+import FichaEstablecimiento from './tabs/FichaEstablecimiento'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: '📊', roles: ['admin', 'viewer'] },
@@ -31,6 +32,11 @@ const NAV_ITEMS = [
   { path: '/mi-ficha/sostenibilidad', label: 'Sostenibilidad', icon: '🛡️', roles: ['sostenedor'] },
   { path: '/mi-ficha/riesgo', label: 'Riesgo', icon: '📊', roles: ['sostenedor'] },
   { path: '/mi-subvencion', label: 'Subvenciones', icon: '🏫', roles: ['sostenedor'] },
+  { path: '/mi-establecimiento', label: 'Mi Establecimiento', icon: '🏫', roles: ['establecimiento'] },
+  { path: '/mi-establecimiento/financiero', label: 'Financiero', icon: '💵', roles: ['establecimiento'] },
+  { path: '/mi-establecimiento/eficiencia', label: 'Eficiencia del Gasto', icon: '⚙️', roles: ['establecimiento'] },
+  { path: '/mi-establecimiento/riesgo', label: 'Riesgo', icon: '📊', roles: ['establecimiento'] },
+  { path: '/mi-establecimiento/subvencion', label: 'Subvenciones', icon: '🏷️', roles: ['establecimiento'] },
 ]
 
 export default function Dashboard() {
@@ -64,7 +70,7 @@ export default function Dashboard() {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/'}
+              end={item.path === '/' || visibleNav.some(other => other.path !== item.path && other.path.startsWith(item.path + '/'))}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               title={item.label}
             >
@@ -94,7 +100,7 @@ export default function Dashboard() {
       <main className="main-content">
         <div className="page-wrapper">
           <Routes>
-            <Route path="/" element={user?.role === 'sostenedor' ? <Navigate to="/mi-ficha" replace /> : <Resumen />} />
+            <Route path="/" element={user?.role === 'sostenedor' ? <Navigate to="/mi-ficha" replace /> : user?.role === 'establecimiento' ? <Navigate to="/mi-establecimiento" replace /> : <Resumen />} />
             <Route path="/tendencia" element={<Tendencia />} />
             <Route path="/subvencion" element={<Subvencion />} />
             <Route path="/sostenedores" element={<Sostenedores />} />
@@ -116,6 +122,15 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/sostenibilidad" element={<FichaSostenedor section="sostenibilidad" />} />
                 <Route path="/mi-ficha/riesgo" element={<FichaSostenedor section="riesgo" />} />
                 <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
+              </>
+            )}
+            {user?.role === 'establecimiento' && (
+              <>
+                <Route path="/mi-establecimiento" element={<FichaEstablecimiento section="perfil" />} />
+                <Route path="/mi-establecimiento/financiero" element={<FichaEstablecimiento section="financiero" />} />
+                <Route path="/mi-establecimiento/eficiencia" element={<FichaEstablecimiento section="eficiencia" />} />
+                <Route path="/mi-establecimiento/riesgo" element={<FichaEstablecimiento section="riesgo" />} />
+                <Route path="/mi-establecimiento/subvencion" element={<FichaEstablecimiento section="subvencion" />} />
               </>
             )}
           </Routes>

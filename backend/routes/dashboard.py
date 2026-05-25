@@ -977,7 +977,7 @@ async def ficha_sostenedor_detalle_rbd(
         SELECT
             r.rbd,
             eo.nom_rbd,
-            COUNT(*) AS funcionarios,
+            COUNT(DISTINCT r.rut) AS funcionarios,
             SUM(r.liquido) AS total_liquido,
             ROUND(AVG(r.liquido), 0) AS promedio_liquido
         FROM remuneraciones r
@@ -1087,3 +1087,185 @@ async def ficha_sostenedor_detalle_rbd(
         "acreditacion_rbd": acreditacion_rbd,
         "periodos_disponibles": periodos_disponibles,
     }
+
+
+# ── Ficha Establecimiento (rol: establecimiento) ─────────────────────────────
+
+@router.get("/ficha-rbd")
+async def ficha_rbd(
+    rbd: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Perfil de un establecimiento unico. Retorna datos del EE y los periodos disponibles."""
+    per_q = await db.execute(text("""
+        SELECT DISTINCT agno FROM dim_establecimiento_oficial
+        WHERE rbd = :rbd ORDER BY agno DESC
+    """), {"rbd": rbd})
+    periodos_disponibles = [r[0] for r in per_q.fetchall()]
+    agno = periodo if periodo in periodos_disponibles else (periodos_disponibles[0] if periodos_disponibles else periodo)
+
+    perfil_q = await db.execute(text("""
+        SELECT rbd, nom_rbd, rut_sostenedor, estado_estab, matricula,
+               mat_total, rural_rbd, convenio_pie, pace,
+               ens_01, ens_02, ens_03, ens_04, ens_05,
+               ens_06, ens_07, ens_08, ens_09, ens_10, ens_11
+        FROM dim_establecimiento_oficial
+        WHERE rbd = :rbd AND agno = :agno LIMIT 1
+    """), {"rbd": rbd, "agno": agno})
+    row = perfil_q.mappings().one_or_none()
+    if row is None:
+        return {"perfil": None, "periodos_disponibles": periodos_disponibles}
+
+    sost_q = await db.execute(text("""
+        SELECT nombre_sost FROM dim_sostenedor_oficial
+        WHERE rut_sost = :sid AND agno = :agno LIMIT 1
+    """), {"sid": row["rut_sostenedor"], "agno": agno})
+    sost_row = sost_q.mappings().one_or_none()
+
+    perfil = {
+        "rbd": row["rbd"], "nom_rbd": row["nom_rbd"],
+        "rut_sostenedor": row["rut_sostenedor"],
+        "nombre_sostenedor": sost_row["nombre_sost"] if sost_row else None,
+        "estado_estab": row["estado_estab"], "matricula": row["matricula"],
+        "mat_total": int(row["mat_total"] or 0),
+        "rural_rbd": bool(row["rural_rbd"]), "convenio_pie": bool(row["convenio_pie"]), "pace": bool(row["pace"]),
+        "ens_01": row["ens_01"], "ens_02": row["ens_02"], "ens_03": row["ens_03"],
+        "ens_04": row["ens_04"], "ens_05": row["ens_05"], "ens_06": row["ens_06"],
+        "ens_07": row["ens_07"], "ens_08": row["ens_08"], "ens_09": row["ens_09"],
+        "ens_10": row["ens_10"], "ens_11": row["ens_11"], "agno": int(agno),
+    }
+    return {"perfil": perfil, "periodos_disponibles": periodos_disponibles}
+
+
+@router.get("/ficha-rbd/detalle")
+async def ficha_rbd_detalle(
+    rbd: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Serie temporal de financiero, eficiencia y acreditacion para un RBD."""
+
+    fin_q = await db.execute(text("""
+        SELECT er.periodo,
+            SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+                     AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+                     THEN er.monto_declarado ELSE 0 END) AS ingreso,
+            SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+                     AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+                     THEN er.monto_declarado ELSE 0 END) AS gasto,
+            SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+                     AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+                     THEN er.monto_declarado
+                     WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+                     AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+                     THEN -er.monto_declarado ELSE 0 END) AS superavit
+        FROM estado_resultado er
+        WHERE er.rbd = :rbd
+        GROUP BY er.periodo ORDER BY er.periodo
+    """), {"rbd": rbd})
+    financiero_serie = [dict(r) for r in fin_q.mappings()]
+
+    rem_q = await db.execute(text("""
+        SELECT r.anio AS periodo, COUNT(*) AS funcionarios,
+               SUM(r.liquido) AS total_liquido,
+               ROUND(AVG(r.liquido), 0) AS promedio_liquido
+        FROM remuneraciones r WHERE r.rbd = :rbd
+        GROUP BY r.anio ORDER BY r.anio
+    """), {"rbd": rbd})
+    remuneraciones_serie = [dict(r) for r in rem_q.mappings()]
+
+    ef_q = await db.execute(text("""
+        SELECT er.periodo,
+            SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+                  AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+            ) AS total_gasto,
+            ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND er.cuenta_alias LIKE '410%'
+            ) / NULLIF(SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+            ), 0), 1) AS pct_aula,
+            ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND er.cuenta_alias LIKE '411%'
+            ) / NULLIF(SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+            ), 0), 1) AS pct_admin,
+            ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND er.cuenta_alias LIKE '700%'
+            ) / NULLIF(SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO' AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+            ), 0), 1) AS pct_otros
+        FROM estado_resultado er WHERE er.rbd = :rbd
+        GROUP BY er.periodo
+        HAVING SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%') > 0
+        ORDER BY er.periodo
+    """), {"rbd": rbd})
+    eficiencia_raw = [dict(r) for r in ef_q.mappings()]
+    eficiencia_serie = []
+    for row in eficiencia_raw:
+        pct = float(row.get("pct_admin") or 0)
+        nivel = "Elevado" if pct > 25 else ("Moderado" if pct > 15 else "Optimo")
+        eficiencia_serie.append({**row, "nivel_eficiencia": nivel})
+
+    acred_q = await db.execute(text("""
+        SELECT er.periodo,
+            COALESCE(docs.total_docs, 0) AS total_docs,
+            SUM(er.monto_declarado) AS monto_total,
+            COALESCE(SUM(er.monto_declarado) FILTER (WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'), 0) AS monto_rendido,
+            COALESCE(SUM(er.monto_declarado) FILTER (WHERE UPPER(TRIM(er.desc_estado)) != 'RENDIDO'), 0) AS monto_no_rendido,
+            ROUND(100.0 * COALESCE(SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'), 0) / NULLIF(SUM(er.monto_declarado), 0), 1) AS pct_rendido,
+            ROUND(100.0 * COALESCE(SUM(er.monto_declarado) FILTER (
+                WHERE UPPER(TRIM(er.desc_estado)) != 'RENDIDO'), 0) / NULLIF(SUM(er.monto_declarado), 0), 1) AS pct_no_rendido
+        FROM estado_resultado er
+        LEFT JOIN (
+            SELECT periodo, COUNT(*) AS total_docs FROM documentos WHERE rbd = :rbd GROUP BY periodo
+        ) docs ON docs.periodo = er.periodo
+        WHERE er.rbd = :rbd
+        GROUP BY er.periodo, docs.total_docs
+        HAVING SUM(er.monto_declarado) > 0
+        ORDER BY er.periodo
+    """), {"rbd": rbd})
+    acred_raw = [dict(r) for r in acred_q.mappings()]
+    acreditacion_serie = []
+    for row in acred_raw:
+        pct = float(row.get("pct_rendido") or 0)
+        nivel = "Riesgo Bajo" if pct >= 90 else ("Riesgo Moderado" if pct >= 70 else "Riesgo Alto")
+        acreditacion_serie.append({**row, "nivel_riesgo": nivel})
+
+    return {
+        "financiero_serie": financiero_serie,
+        "remuneraciones_serie": remuneraciones_serie,
+        "eficiencia_serie": eficiencia_serie,
+        "acreditacion_serie": acreditacion_serie,
+    }
+
+
+@router.get("/subvencion-rbd")
+async def subvencion_rbd(
+    rbd: int = Query(...),
+    periodo: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Distribucion de subvenciones para un RBD desde tabla documentos."""
+    if periodo:
+        q = await db.execute(text("""
+            SELECT subvencion_alias, SUM(monto_declarado) AS monto_total, COUNT(id) AS n_documentos
+            FROM documentos
+            WHERE rbd = :rbd AND subvencion_alias IS NOT NULL AND subvencion_alias <> ''
+              AND periodo = :p
+            GROUP BY subvencion_alias ORDER BY monto_total DESC LIMIT 20
+        """), {"rbd": rbd, "p": periodo})
+    else:
+        q = await db.execute(text("""
+            SELECT subvencion_alias, SUM(monto_declarado) AS monto_total, COUNT(id) AS n_documentos
+            FROM documentos
+            WHERE rbd = :rbd AND subvencion_alias IS NOT NULL AND subvencion_alias <> ''
+            GROUP BY subvencion_alias ORDER BY monto_total DESC LIMIT 20
+        """), {"rbd": rbd})
+    return [dict(r) for r in q.mappings()]
