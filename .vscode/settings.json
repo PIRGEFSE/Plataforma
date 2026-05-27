@@ -1,9 +1,21 @@
 {
+  // ── Intérprete Python (venv del backend) ────────────────────────────────
   "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+
+  // ── Pylance: rutas extra para resolver módulos locales del backend ───────
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"
   ],
+  "python.analysis.venvPath": "${workspaceFolder}/backend",
+  "python.analysis.venv": ".venv",
+
+  // ── Pyrefly: type-checker separado, necesita su propio apuntador al venv ─
+  "pyrefly.pythonInterpreter": "${workspaceFolder}/backend/.venv/bin/python",
+
+  // ── Variables de entorno ─────────────────────────────────────────────────
   "python.envFile": "${workspaceFolder}/backend/.env",
+
+  // ── Formateador por defecto para Python ─────────────────────────────────
   "[python]": {
     "editor.defaultFormatter": "ms-python.python"
   }

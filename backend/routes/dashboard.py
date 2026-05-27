@@ -1091,7 +1091,405 @@ async def ficha_sostenedor_detalle_rbd(
 
 # ── Ficha Establecimiento (rol: establecimiento) ─────────────────────────────
 
+@router.get("/ficha-sostenedor/territorio")
+async def ficha_sostenedor_territorio(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Datos de Territorio para un sostenedor específico.
+    Combina dim_ive con dim_establecimiento_oficial para mostrar
+    IVE por establecimiento, distribución por nivel, ruralidad y comuna.
+    """
+
+    # ── Períodos disponibles (IVE + dim_establecimiento) ────────────────────
+    per_q = await db.execute(text("""
+        SELECT DISTINCT ive.periodo
+        FROM dim_ive ive
+        JOIN dim_establecimiento_oficial eo ON eo.rbd = ive.rbd AND eo.agno = ive.periodo
+        WHERE eo.rut_sostenedor = :sid
+        ORDER BY ive.periodo DESC
+    """), {"sid": sost_id})
+    periodos_disponibles = [r[0] for r in per_q.fetchall()]
+
+    # Usar el período más cercano disponible si el solicitado no existe
+    agno = periodo if periodo in periodos_disponibles else (periodos_disponibles[0] if periodos_disponibles else periodo)
+
+    # ── Lista de establecimientos con IVE ────────────────────────────────────
+    ee_q = await db.execute(text("""
+        SELECT
+            ive.rbd,
+            ive.nom_establecimiento,
+            ive.nivel,
+            ive.nom_region,
+            ive.nom_provincia,
+            ive.nom_comuna,
+            ive.nom_ruralidad,
+            ive.nom_tipo_dependencia,
+            ive.primera_prioridad,
+            ive.segunda_prioridad,
+            ive.tercera_prioridad,
+            ive.no_priorizado,
+            ive.sin_informacion,
+            ive.total_matricula,
+            ROUND(CAST(ive.ive_sinae AS NUMERIC), 4) AS ive_sinae,
+            eo.rural_rbd,
+            eo.convenio_pie,
+            eo.pace
+        FROM dim_ive ive
+        JOIN dim_establecimiento_oficial eo ON eo.rbd = ive.rbd AND eo.agno = ive.periodo
+        WHERE eo.rut_sostenedor = :sid
+          AND ive.periodo = :agno
+        ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento
+    """), {"sid": sost_id, "agno": agno})
+    ive_establecimientos = [dict(r) for r in ee_q.mappings()]
+
+    # Convertir Decimal a float
+    for row in ive_establecimientos:
+        if row.get("ive_sinae") is not None:
+            row["ive_sinae"] = float(row["ive_sinae"])
+
+    # ── Resumen estadístico ──────────────────────────────────────────────────
+    total_ee = len(ive_establecimientos)
+    total_mat = sum(r.get("total_matricula") or 0 for r in ive_establecimientos)
+    ives = [r["ive_sinae"] for r in ive_establecimientos if r.get("ive_sinae") is not None]
+    prom_ive = round(sum(ives) / len(ives), 4) if ives else 0
+
+    # Distribución por nivel
+    por_nivel: dict[str, dict] = {}
+    for r in ive_establecimientos:
+        nv = r.get("nivel") or "Sin info"
+        if nv not in por_nivel:
+            por_nivel[nv] = {"nivel": nv, "n_establecimientos": 0, "total_matricula": 0, "ive_promedio": []}
+        por_nivel[nv]["n_establecimientos"] += 1
+        por_nivel[nv]["total_matricula"] += r.get("total_matricula") or 0
+        if r.get("ive_sinae") is not None:
+            por_nivel[nv]["ive_promedio"].append(r["ive_sinae"])
+
+    nivel_resumen = []
+    for nv, d in por_nivel.items():
+        prom = round(sum(d["ive_promedio"]) / len(d["ive_promedio"]), 4) if d["ive_promedio"] else 0
+        nivel_resumen.append({
+            "nivel": nv,
+            "n_establecimientos": d["n_establecimientos"],
+            "total_matricula": d["total_matricula"],
+            "ive_promedio": prom,
+        })
+
+    # Distribución por ruralidad
+    por_ruralidad: dict[str, int] = {}
+    for r in ive_establecimientos:
+        rural = r.get("nom_ruralidad") or "Sin info"
+        por_ruralidad[rural] = por_ruralidad.get(rural, 0) + 1
+
+    # Distribución por comuna (agrupado, promedio IVE y total matrícula)
+    por_comuna_map: dict[str, dict] = {}
+    for r in ive_establecimientos:
+        com = r.get("nom_comuna") or "Sin info"
+        if com not in por_comuna_map:
+            por_comuna_map[com] = {"nom_comuna": com, "n_establecimientos": 0, "total_matricula": 0, "ive_vals": []}
+        por_comuna_map[com]["n_establecimientos"] += 1
+        por_comuna_map[com]["total_matricula"] += r.get("total_matricula") or 0
+        if r.get("ive_sinae") is not None:
+            por_comuna_map[com]["ive_vals"].append(r["ive_sinae"])
+
+    por_comuna = []
+    for com, d in por_comuna_map.items():
+        prom = round(sum(d["ive_vals"]) / len(d["ive_vals"]), 4) if d["ive_vals"] else 0
+        por_comuna.append({
+            "nom_comuna": com,
+            "n_establecimientos": d["n_establecimientos"],
+            "total_matricula": d["total_matricula"],
+            "ive_promedio": prom,
+        })
+    por_comuna.sort(key=lambda x: x["ive_promedio"], reverse=True)
+
+    # Distribución de prioridades (suma total)
+    total_1p = sum(r.get("primera_prioridad") or 0 for r in ive_establecimientos)
+    total_2p = sum(r.get("segunda_prioridad") or 0 for r in ive_establecimientos)
+    total_3p = sum(r.get("tercera_prioridad") or 0 for r in ive_establecimientos)
+    total_np = sum(r.get("no_priorizado") or 0 for r in ive_establecimientos)
+    total_si = sum(r.get("sin_informacion") or 0 for r in ive_establecimientos)
+
+    return {
+        "ive_establecimientos": ive_establecimientos,
+        "nivel_resumen": nivel_resumen,
+        "por_ruralidad": [{"nom_ruralidad": k, "n_establecimientos": v} for k, v in por_ruralidad.items()],
+        "por_comuna": por_comuna,
+        "total_establecimientos": total_ee,
+        "total_matricula": total_mat,
+        "ive_promedio": prom_ive,
+        "prioridades": {
+            "primera": total_1p,
+            "segunda": total_2p,
+            "tercera": total_3p,
+            "no_priorizado": total_np,
+            "sin_informacion": total_si,
+        },
+        "periodos_disponibles": periodos_disponibles,
+        "periodo_usado": agno,
+    }
+
+
+@router.get("/ficha-sostenedor/gasto-educativo")
+async def ficha_sostenedor_gasto_educativo(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Datos de Gasto Educativo para un sostenedor.
+    Utiliza la tabla documentos agrupada por nombre_rbd para manejar
+    casos donde el rbd no está asignado (ej. Administración Central).
+    """
+    
+    # ── Gasto por Establecimiento / Centro de costo ───────────────────────────
+    q_ee = await db.execute(text("""
+        SELECT 
+            d.rbd, 
+            d.nombre_rbd, 
+            SUM(d.monto_declarado) as total_gasto,
+            COUNT(d.id) as num_documentos,
+            eo.estado_estab, 
+            eo.matricula,
+            eo.rural_rbd,
+            eo.cod_com_rbd,
+            eo.nom_com_rbd
+        FROM documentos d
+        LEFT JOIN dim_establecimiento_oficial eo ON eo.rbd = d.rbd AND eo.agno = d.periodo
+        WHERE d.sost_id = :sid AND d.periodo = :agno
+        GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
+        ORDER BY total_gasto DESC NULLS LAST
+    """), {"sid": sost_id, "agno": periodo})
+    
+    gasto_establecimientos = []
+    for r in q_ee.mappings():
+        row_dict = dict(r)
+        if row_dict.get("total_gasto") is not None:
+            row_dict["total_gasto"] = float(row_dict["total_gasto"])
+        gasto_establecimientos.append(row_dict)
+
+    # ── Gasto por Cuenta Padre ────────────────────────────────────────────────
+    q_cuenta = await db.execute(text("""
+        SELECT 
+            COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN') as categoria, 
+            SUM(monto_declarado) as total_gasto
+        FROM documentos
+        WHERE sost_id = :sid AND periodo = :agno
+        GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN')
+        ORDER BY total_gasto DESC NULLS LAST
+    """), {"sid": sost_id, "agno": periodo})
+    
+    gasto_por_cuenta = []
+    for r in q_cuenta.mappings():
+        row_dict = dict(r)
+        if row_dict.get("total_gasto") is not None:
+            row_dict["total_gasto"] = float(row_dict["total_gasto"])
+        gasto_por_cuenta.append(row_dict)
+
+    # ── Resumen ───────────────────────────────────────────────────────────────
+    total_gasto = sum(r.get("total_gasto") or 0 for r in gasto_establecimientos)
+    total_docs = sum(r.get("num_documentos") or 0 for r in gasto_establecimientos)
+    total_centros = len(gasto_establecimientos)
+
+    return {
+        "gasto_establecimientos": gasto_establecimientos,
+        "gasto_por_cuenta": gasto_por_cuenta,
+        "resumen": {
+            "total_gasto": total_gasto,
+            "total_documentos": total_docs,
+            "total_centros": total_centros
+        },
+        "periodo_usado": periodo
+    }
+
+@router.get("/ficha-sostenedor/costo-alumno")
+async def ficha_sostenedor_costo_alumno(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Datos de Costo por Alumno (Eficiencia).
+    Excluye registros sin RBD y cruza con matrícula.
+    Divide el gasto en Docencia y Operacional.
+    """
+    query = await db.execute(text("""
+        WITH gastos AS (
+            SELECT 
+                d.rbd,
+                d.nombre_rbd,
+                SUM(d.monto_declarado) as total_gasto,
+                SUM(CASE WHEN d.desc_cuenta_padre IN (
+                    'GASTOS EN EQUIPAMIENTO DE APOYO PEDAGÓGICO', 
+                    'GASTOS EN RECURSOS DE APRENDIZAJE', 
+                    'OTROS GASTOS EN PERSONAL', 
+                    'GASTOS EN ALUMNOS', 
+                    'GASTOS BIENESTAR ALUMNOS',
+                    'ASESORÍA TÉCNICA Y ACTIVIDADES DE INFORMACIÓN Y ORIENTACIÓN'
+                ) THEN d.monto_declarado ELSE 0 END) as gasto_docencia,
+                SUM(CASE WHEN d.desc_cuenta_padre NOT IN (
+                    'GASTOS EN EQUIPAMIENTO DE APOYO PEDAGÓGICO', 
+                    'GASTOS EN RECURSOS DE APRENDIZAJE', 
+                    'OTROS GASTOS EN PERSONAL', 
+                    'GASTOS EN ALUMNOS', 
+                    'GASTOS BIENESTAR ALUMNOS',
+                    'ASESORÍA TÉCNICA Y ACTIVIDADES DE INFORMACIÓN Y ORIENTACIÓN'
+                ) THEN d.monto_declarado ELSE 0 END) as gasto_operacional
+            FROM documentos d
+            WHERE d.sost_id = :sid AND d.periodo = :agno AND d.rbd IS NOT NULL
+            GROUP BY d.rbd, d.nombre_rbd
+        )
+        SELECT 
+            g.rbd,
+            g.nombre_rbd,
+            g.total_gasto,
+            g.gasto_docencia,
+            g.gasto_operacional,
+            eo.mat_total,
+            CASE WHEN eo.mat_total > 0 THEN g.total_gasto / eo.mat_total ELSE 0 END as costo_por_alumno
+        FROM gastos g
+        LEFT JOIN dim_establecimiento_oficial eo ON g.rbd = eo.rbd AND eo.agno = :agno
+        ORDER BY costo_por_alumno DESC NULLS LAST
+    """), {"sid": sost_id, "agno": periodo})
+
+    costo_establecimientos = []
+    total_gasto = 0
+    total_docencia = 0
+    total_operacional = 0
+    total_matricula_evaluada = 0
+
+    for r in query.mappings():
+        row_dict = dict(r)
+        
+        # Parse to float
+        for k in ["total_gasto", "gasto_docencia", "gasto_operacional", "costo_por_alumno"]:
+            if row_dict.get(k) is not None:
+                row_dict[k] = float(row_dict[k])
+                
+        costo_establecimientos.append(row_dict)
+        
+        total_gasto += row_dict.get("total_gasto") or 0
+        total_docencia += row_dict.get("gasto_docencia") or 0
+        total_operacional += row_dict.get("gasto_operacional") or 0
+        total_matricula_evaluada += row_dict.get("mat_total") or 0
+
+    costo_promedio_general = total_gasto / total_matricula_evaluada if total_matricula_evaluada > 0 else 0
+
+    return {
+        "costo_establecimientos": costo_establecimientos,
+        "resumen": {
+            "total_gasto": total_gasto,
+            "total_docencia": total_docencia,
+            "total_operacional": total_operacional,
+            "total_matricula_evaluada": total_matricula_evaluada,
+            "costo_promedio_general": costo_promedio_general
+        }
+    }
+
+
+@router.get("/ficha-sostenedor/gasto-administrativo")
+async def ficha_sostenedor_gasto_administrativo(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Datos de Gasto Administrativo / Remuneraciones (Eficiencia).
+    Usa la tabla remuneraciones filtrando cuenta_alias LIKE '4101%'.
+    Agrupa por RBD y FUN.
+    """
+    # 1. Gasto por establecimiento y desglosado por las principales funciones
+    q_ee = await db.execute(text("""
+        WITH base AS (
+            SELECT 
+                r.rbd,
+                eo.nom_rbd,
+                SUM(r.monto) as total_gasto,
+                SUM(CASE WHEN r.fun = 'DOCAUL' THEN r.monto ELSE 0 END) as gasto_docaul,
+                SUM(CASE WHEN r.fun = 'ASIPAR' THEN r.monto ELSE 0 END) as gasto_asipar,
+                SUM(CASE WHEN r.fun = 'DOCDIR' THEN r.monto ELSE 0 END) as gasto_docdir,
+                SUM(CASE WHEN r.fun NOT IN ('DOCAUL', 'ASIPAR', 'DOCDIR') THEN r.monto ELSE 0 END) as gasto_otros
+            FROM remuneraciones r
+            LEFT JOIN dim_establecimiento_oficial eo ON r.rbd = eo.rbd AND eo.agno = :agno
+            WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+            GROUP BY r.rbd, eo.nom_rbd
+        )
+        SELECT * FROM base ORDER BY total_gasto DESC NULLS LAST
+    """), {"sid": sost_id, "agno": periodo})
+
+    gasto_por_establecimiento = []
+    for r in q_ee.mappings():
+        d = dict(r)
+        if not d.get("rbd"):
+            d["nom_rbd"] = "ADMINISTRACIÓN CENTRAL"
+        for k in ["total_gasto", "gasto_docaul", "gasto_asipar", "gasto_docdir", "gasto_otros"]:
+            if d.get(k) is not None:
+                d[k] = float(d[k])
+        gasto_por_establecimiento.append(d)
+
+    # 2. Gasto total por Función (Top 10)
+    q_fun = await db.execute(text("""
+        SELECT 
+            COALESCE('(' || df.dependencia_funcion || ') ' || df.descripcion, r.fun, 'SIN FUN') as fun, 
+            SUM(r.monto) as total
+        FROM remuneraciones r
+        LEFT JOIN dim_funcion df ON r.fun = df.abrev
+        WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+        GROUP BY COALESCE('(' || df.dependencia_funcion || ') ' || df.descripcion, r.fun, 'SIN FUN')
+        ORDER BY total DESC
+        LIMIT 10
+    """), {"sid": sost_id, "agno": periodo})
+    
+    gasto_por_funcion = []
+    for r in q_fun.mappings():
+        d = dict(r)
+        if d.get("total") is not None:
+            d["total"] = float(d["total"])
+        gasto_por_funcion.append(d)
+
+    # 3. Gasto por Cuenta (Top 10)
+    q_cuenta = await db.execute(text("""
+        SELECT 
+            COALESCE(dc.desc_cuenta, r.cuenta_alias) as cuenta_alias, 
+            SUM(r.monto) as total
+        FROM remuneraciones r
+        LEFT JOIN dim_cuenta dc ON r.cuenta_alias = dc.cuenta_alias
+        WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+        GROUP BY COALESCE(dc.desc_cuenta, r.cuenta_alias)
+        ORDER BY total DESC
+        LIMIT 10
+    """), {"sid": sost_id, "agno": periodo})
+
+    gasto_por_cuenta = []
+    for r in q_cuenta.mappings():
+        d = dict(r)
+        if d.get("total") is not None:
+            d["total"] = float(d["total"])
+        gasto_por_cuenta.append(d)
+
+    total_gasto = sum(e.get("total_gasto", 0) for e in gasto_por_establecimiento)
+    total_docaul = sum(e.get("gasto_docaul", 0) for e in gasto_por_establecimiento)
+
+    return {
+        "gasto_por_establecimiento": gasto_por_establecimiento,
+        "gasto_por_funcion": gasto_por_funcion,
+        "gasto_por_cuenta": gasto_por_cuenta,
+        "resumen": {
+            "total_gasto": total_gasto,
+            "total_docaul": total_docaul,
+            "centros": len(gasto_por_establecimiento)
+        }
+    }
+
+
 @router.get("/ficha-rbd")
+
 async def ficha_rbd(
     rbd: int = Query(...),
     periodo: int = Query(default=2024),

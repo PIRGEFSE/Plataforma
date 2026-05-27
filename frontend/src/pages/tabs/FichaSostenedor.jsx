@@ -145,6 +145,7 @@ const SECTION_TITLES = {
   eficiencia: { icon: '⚙️', label: 'Eficiencia del Gasto — por Establecimiento' },
   sostenibilidad: { icon: '🛡️', label: 'Sostenibilidad — por Establecimiento' },
   riesgo: { icon: '📊', label: 'Riesgo — por Establecimiento' },
+  territorio: { icon: '🗺️', label: 'Territorio — IVE por Establecimiento' },
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -157,6 +158,8 @@ export default function FichaSostenedor({ section = 'perfil' }) {
 
   const [rdbData, setRdbData] = useState(null)
   const [loadingRbd, setLoadingRbd] = useState(false)
+  const [territorioData, setTerritorioData] = useState(null)
+  const [loadingTerritorio, setLoadingTerritorio] = useState(false)
   const [periodo, setPeriodo] = useState(2024)
   const [periodos, setPeriodos] = useState([2020, 2021, 2022, 2023, 2024])
   const [unitMode, setUnitMode] = useState('mM')
@@ -231,6 +234,23 @@ export default function FichaSostenedor({ section = 'perfil' }) {
     fetchRbd(periodo)
   }, [periodo, fetchRbd])
 
+  // Carga datos de Territorio (IVE)
+  useEffect(() => {
+    if (section !== 'territorio') return
+    setLoadingTerritorio(true)
+    api.get(`/dashboard/ficha-sostenedor/territorio?sost_id=${sostId}&periodo=${periodo}`)
+      .then(r => {
+        setTerritorioData(r.data)
+        if (r.data.periodos_disponibles?.length) {
+          setPeriodos(prev => {
+            const merged = [...new Set([...r.data.periodos_disponibles, ...prev])].sort((a, b) => b - a)
+            return merged
+          })
+        }
+      })
+      .finally(() => setLoadingTerritorio(false))
+  }, [section, sostId, periodo])
+
   const sec = SECTION_TITLES[section] ?? SECTION_TITLES.perfil
 
   if (loadingPerfil || !perfil) return (
@@ -281,15 +301,21 @@ export default function FichaSostenedor({ section = 'perfil' }) {
           financiero_rbd={rdbData?.financiero_rbd ?? []} loadingRbd={loadingRbd} />
       )}
 
-      {section !== 'perfil' && (
+      {section !== 'perfil' && section !== 'territorio' && (
         loadingRbd
           ? <div className="loading-area"><div className="spinner" /></div>
           : <>
             {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
-            {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} />}
+            {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} />}
             {section === 'sostenibilidad' && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
             {section === 'riesgo' && <TabRiesgo rdbData={rdbData} periodo={periodo} />}
           </>
+      )}
+
+      {section === 'territorio' && (
+        loadingTerritorio
+          ? <div className="loading-area"><div className="spinner" /></div>
+          : <TabTerritorio data={territorioData} periodo={periodo} sostId={sostId} />
       )}
     </div>
     </MoneyFmtCtx.Provider>
@@ -657,8 +683,56 @@ function TabFinanciero({ rdbData, periodo }) {
   )
 }
 
-// ── Tab: Eficiencia del Gasto por RBD ─────────────────────────────────────────
-function TabEficiencia({ rdbData, periodo }) {
+// ── Tab: Eficiencia (Sub-tabs) ──────────────────────────────────────────────────
+function TabEficiencia({ rdbData, periodo, sostId }) {
+  const [subTab, setSubTab] = useState('innovacion')
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setSubTab('innovacion')}
+          style={{
+            padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+            background: subTab === 'innovacion' ? '#3b82f6' : 'transparent',
+            color: subTab === 'innovacion' ? '#fff' : '#94a3b8',
+            border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          💡 Innovación Pedagógica
+        </button>
+        <button
+          onClick={() => setSubTab('costo')}
+          style={{
+            padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+            background: subTab === 'costo' ? '#10b981' : 'transparent',
+            color: subTab === 'costo' ? '#fff' : '#94a3b8',
+            border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          🎓 Costo por Alumno Educativo
+        </button>
+        <button
+          onClick={() => setSubTab('administrativo')}
+          style={{
+            padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+            background: subTab === 'administrativo' ? '#8b5cf6' : 'transparent',
+            color: subTab === 'administrativo' ? '#fff' : '#94a3b8',
+            border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          💼 Gasto Administrativo
+        </button>
+      </div>
+
+      {subTab === 'innovacion' && <RenderInnovacionPedagogica rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'costo' && <RenderCostoAlumno sostId={sostId} periodo={periodo} />}
+      {subTab === 'administrativo' && <RenderGastoAdministrativo sostId={sostId} periodo={periodo} />}
+    </div>
+  )
+}
+
+function RenderInnovacionPedagogica({ rdbData, periodo }) {
   if (!rdbData) return null
   const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
   const { eficiencia_rbd = [] } = rdbData
@@ -673,6 +747,8 @@ function TabEficiencia({ rdbData, periodo }) {
   const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
   const h = Math.max(320, visible.length * 36)
   useEffect(() => { setPage(0) }, [search])
+
+  const tt = () => ({ backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } })
 
   const pct100Option = {
     tooltip: {
@@ -761,6 +837,328 @@ function TabEficiencia({ rdbData, periodo }) {
     </>
   )
 }
+
+function RenderCostoAlumno({ sostId, periodo }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const { fmtAmt, fmtAxisAmt } = useMoneyFmt()
+  const ITEMS_PER_PAGE = 10
+
+  useEffect(() => { setPage(1) }, [search, data, periodo])
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/dashboard/ficha-sostenedor/costo-alumno?sost_id=${sostId}&periodo=${periodo}`)
+      .then(res => setData(res.data))
+      .catch(err => console.error("Error fetching costo alumno", err))
+      .finally(() => setLoading(false))
+  }, [sostId, periodo])
+
+  if (loading) return <div className="loading-area"><div className="spinner" /></div>
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎓</div>
+      <p>Sin datos de costo por alumno disponibles para este período.</p>
+    </div>
+  )
+
+  const { costo_establecimientos = [], resumen = {} } = data
+
+  const filterText = search.toLowerCase().trim()
+  const filtered = costo_establecimientos.filter(ee => 
+    (ee.nombre_rbd ?? '').toLowerCase().includes(filterText) ||
+    String(ee.rbd ?? '').includes(filterText)
+  )
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const inpSt = { padding: '0.35rem 0.75rem', backgroundColor: '#0f172a', color: '#f1f5f9', border: '1px solid #334155', borderRadius: '0.375rem', fontSize: '0.8rem' }
+  const pgBtn = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem', background: dis ? '#0f172a' : '#1e293b', color: dis ? '#475569' : '#e2e8f0', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const ttStyle = { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } }
+
+  // Gráfico 1: Top 10 Costo por Alumno
+  const chartData = [...filtered].sort((a, b) => (b.costo_por_alumno ?? 0) - (a.costo_por_alumno ?? 0)).slice(0, 10)
+  const barOption = {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' }, ...ttStyle,
+      formatter: params => {
+        const d = chartData[params[0].dataIndex]
+        return `<b>${d.nombre_rbd}</b> (${d.rbd})<br/>
+          Costo/Alumno: <b style="color:#10b981">${fmtAmt(d.costo_por_alumno)}</b><br/>
+          Matrícula: ${fmtN(d.mat_total)}`
+      }
+    },
+    grid: { left: 270, right: 80, top: 20, bottom: 20 },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 260, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barMaxWidth: 18,
+      data: chartData.map(d => ({ value: d.costo_por_alumno, itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', formatter: p => fmtAxisAmt(p.value), fontSize: 10, color: '#f1f5f9' }
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  // Gráfico 2: Distribución Docencia vs Operacional (General)
+  const pieOption = {
+    tooltip: { trigger: 'item', ...ttStyle, formatter: p => `<b>${p.name}</b><br/>Monto: ${fmtAmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
+    legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: '#94a3b8', fontSize: 11 } },
+    series: [{ 
+      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], 
+      data: [
+        { name: 'Docencia y Apoyo', value: resumen.total_docencia, itemStyle: { color: '#8b5cf6' } },
+        { name: 'Operacional', value: resumen.total_operacional, itemStyle: { color: '#10b981' } }
+      ],
+      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: '#f1f5f9' } } 
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="🎓" label="Costo Prom. Alumno" value={fmtAmt(resumen.costo_promedio_general)} color="#3b82f6" sub="Nivel Sostenedor" />
+        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(resumen.total_matricula_evaluada)} color="#10b981" sub="Establecimientos evaluados" />
+        <KPICard icon="📚" label="Gasto Docencia" value={fmtAmt(resumen.total_docencia)} color="#8b5cf6" />
+        <KPICard icon="⚙️" label="Gasto Operacional" value={fmtAmt(resumen.total_operacional)} color="#f59e0b" />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por nombre de establecimiento o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
+        {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
+        
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Mostrando <b style={{ color: '#94a3b8' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: '#94a3b8' }}>{filtered.length}</b>
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+          <span style={{ color: '#64748b', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage} / {totalPages}</span>
+          <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #1e293b' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Detalle Costo por Alumno — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: '#0f172a' }}>
+                {[{h:'RBD',a:'left'},{h:'Establecimiento',a:'left'},{h:'Matrícula',a:'right'},{h:'Gasto Docencia',a:'right'},{h:'Gasto Operacional',a:'right'},{h:'Costo por Alumno',a:'right'}].map(({h,a})=>(
+                  <th key={h} style={{padding:'0.55rem 0.8rem',color:'#64748b',fontWeight:600,textAlign:a,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={6} style={{padding:'2rem',textAlign:'center',color:'#64748b'}}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd}</td>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#e2e8f0',maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
+                  </td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#94a3b8',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.mat_total)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#8b5cf6',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docencia)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_operacional)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#3b82f6',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.costo_por_alumno)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'0.75rem 1.25rem',borderTop:'1px solid #1e293b',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <span style={{color:'#64748b',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
+          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
+            <span style={{color:'#64748b',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
+            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Mayor Costo por Alumno (filtrado)</h3>
+          {chartData.length===0
+            ? <p style={{color:'#64748b',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{height:Math.max(280,chartData.length*38)}} theme="dark" />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Distribución General de Costos</h3>
+          <ReactECharts option={pieOption} style={{height:300}} theme="dark" />
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+
+function RenderGastoAdministrativo({ sostId, periodo }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const { fmtAmt, fmtAxisAmt } = useMoneyFmt()
+  const ITEMS_PER_PAGE = 10
+
+  useEffect(() => { setPage(1) }, [search, data, periodo])
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/dashboard/ficha-sostenedor/gasto-administrativo?sost_id=${sostId}&periodo=${periodo}`)
+      .then(res => setData(res.data))
+      .catch(err => console.error("Error fetching gasto administrativo", err))
+      .finally(() => setLoading(false))
+  }, [sostId, periodo])
+
+  if (loading) return <div className="loading-area"><div className="spinner" /></div>
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💼</div>
+      <p>Sin datos de remuneraciones disponibles para este período.</p>
+    </div>
+  )
+
+  const { gasto_por_establecimiento = [], gasto_por_funcion = [], gasto_por_cuenta = [], resumen = {} } = data
+
+  const filterText = search.toLowerCase().trim()
+  const filtered = gasto_por_establecimiento.filter(ee => 
+    (ee.nom_rbd ?? '').toLowerCase().includes(filterText) ||
+    String(ee.rbd ?? '').includes(filterText)
+  )
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const inpSt = { padding: '0.35rem 0.75rem', backgroundColor: '#0f172a', color: '#f1f5f9', border: '1px solid #334155', borderRadius: '0.375rem', fontSize: '0.8rem' }
+  const pgBtn = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem', background: dis ? '#0f172a' : '#1e293b', color: dis ? '#475569' : '#e2e8f0', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const ttStyle = { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } }
+
+  // Gráfico 1: Función
+  const barOption = {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' }, ...ttStyle,
+      formatter: params => {
+        const d = gasto_por_funcion[params[0].dataIndex]
+        return `<b>${d.fun}</b><br/>Gasto: <b style="color:#8b5cf6">${fmtAmt(d.total)}</b>`
+      }
+    },
+    grid: { left: 80, right: 30, top: 20, bottom: 20 },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: gasto_por_funcion.map(d => d.fun.length > 30 ? d.fun.slice(0, 28) + '...' : d.fun), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 140, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barMaxWidth: 18,
+      data: gasto_por_funcion.map(d => ({ value: d.total, itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', formatter: p => fmtAxisAmt(p.value), fontSize: 10, color: '#f1f5f9' }
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  // Gráfico 2: Cuenta Alias
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b']
+  const pieOption = {
+    tooltip: { trigger: 'item', ...ttStyle, formatter: p => `<b>${p.name}</b><br/>Gasto: ${fmtAmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
+    legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: '#94a3b8', fontSize: 10 }, formatter: name => name.length > 35 ? name.slice(0, 33) + '...' : name },
+    series: [{ 
+      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], 
+      data: gasto_por_cuenta.map((c, i) => ({ name: c.cuenta_alias, value: c.total, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: '#f1f5f9' } } 
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="💼" label="Gasto Total Remuneracional" value={fmtAmt(resumen.total_gasto)} color="#8b5cf6" />
+        <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.centros)} color="#3b82f6" sub="Establec. + Adm. Central" />
+        <KPICard icon="👨‍🏫" label="Gasto Docentes de Aula" value={fmtAmt(resumen.total_docaul)} color="#10b981" sub="Función DOCAUL" />
+        <KPICard icon="📊" label="Promedio por Centro" value={fmtAmt(resumen.centros ? resumen.total_gasto / resumen.centros : 0)} color="#f59e0b" />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por nombre de establecimiento o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
+        {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
+        
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Mostrando <b style={{ color: '#94a3b8' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: '#94a3b8' }}>{filtered.length}</b>
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+          <span style={{ color: '#64748b', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage} / {totalPages}</span>
+          <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #1e293b' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Distribución Remuneracional por RBD — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: '#0f172a' }}>
+                {[{h:'RBD',a:'left'},{h:'Establecimiento',a:'left'},{h:'Doc. Aula',a:'right'},{h:'Asist. Parvularia',a:'right'},{h:'Doc. Directivo',a:'right'},{h:'Otros Gastos',a:'right'},{h:'Total Gasto',a:'right'}].map(({h,a})=>(
+                  <th key={h} style={{padding:'0.55rem 0.8rem',color:'#64748b',fontWeight:600,textAlign:a,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:'#64748b'}}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nom_rbd}`} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd || 'N/A'}</td>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#e2e8f0',maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <span title={ee.nom_rbd}>{ee.nom_rbd}</span>
+                  </td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docaul)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#3b82f6',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_asipar)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#f59e0b',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docdir)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#94a3b8',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_otros)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#8b5cf6',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.total_gasto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'0.75rem 1.25rem',borderTop:'1px solid #1e293b',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <span style={{color:'#64748b',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
+          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
+            <span style={{color:'#64748b',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
+            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Gasto por Tipo de Función (FUN)</h3>
+          {gasto_por_funcion.length===0
+            ? <p style={{color:'#64748b',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{height:Math.max(280,gasto_por_funcion.length*38)}} theme="dark" />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Gasto por Cuenta Alias</h3>
+          {gasto_por_cuenta.length===0
+            ? <p style={{color:'#64748b',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
+            : <ReactECharts option={pieOption} style={{height:300}} theme="dark" />
+          }
+        </div>
+      </div>
+    </>
+  )
+}
+
 
 // ── Tab: Sostenibilidad ────────────────────────────────────────────────────────
 function TabSostenibilidad({ rdbData, periodo }) {
@@ -1062,3 +1460,436 @@ function TabRiesgo({ rdbData, periodo }) {
   )
 }
 
+
+// ── Tab: Territorio (Sub-tabs) ──────────────────────────────────────────────────
+function TabTerritorio({ data, periodo, sostId }) {
+  const [subTab, setSubTab] = useState('complejidad')
+  
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem' }}>
+        <button
+          onClick={() => setSubTab('complejidad')}
+          style={{
+            padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+            background: subTab === 'complejidad' ? '#3b82f6' : 'transparent',
+            color: subTab === 'complejidad' ? '#fff' : '#94a3b8',
+            border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          🧩 Complejidad Educativa
+        </button>
+        <button
+          onClick={() => setSubTab('gasto')}
+          style={{
+            padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+            background: subTab === 'gasto' ? '#10b981' : 'transparent',
+            color: subTab === 'gasto' ? '#fff' : '#94a3b8',
+            border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          💰 Gasto Educativo
+        </button>
+      </div>
+
+      {subTab === 'complejidad' && <RenderComplejidadEducativa data={data} periodo={periodo} />}
+      {subTab === 'gasto' && <RenderGastoEducativo sostId={sostId} periodo={periodo} />}
+    </div>
+  )
+}
+
+function RenderComplejidadEducativa({ data, periodo }) {
+  const [search, setSearch] = useState('')
+  const [nivelFilter, setNivelFilter] = useState('all')
+  const [ruralFilter, setRuralFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
+
+  useEffect(() => { setPage(1) }, [search, nivelFilter, ruralFilter, data, periodo])
+
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🗺️</div>
+      <p>Sin datos de complejidad disponibles para este período.</p>
+    </div>
+  )
+
+  const { ive_establecimientos = [], nivel_resumen = [], por_comuna = [], prioridades = {} } = data
+
+  const filterText = search.toLowerCase().trim()
+  const filtered = ive_establecimientos.filter(ee => {
+    const matchName = (ee.nom_establecimiento ?? '').toLowerCase().includes(filterText)
+    const matchNivel = nivelFilter === 'all' ? true : ee.nivel === nivelFilter
+    const matchRural = ruralFilter === 'all' ? true : ruralFilter === 'rural' ? ee.rural_rbd === 1 : ee.rural_rbd !== 1
+    return matchName && matchNivel && matchRural
+  })
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const inpSt = { padding: '0.35rem 0.75rem', backgroundColor: '#0f172a', color: '#f1f5f9', border: '1px solid #334155', borderRadius: '0.375rem', fontSize: '0.8rem' }
+  const pgBtn = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem', background: dis ? '#0f172a' : '#1e293b', color: dis ? '#475569' : '#e2e8f0', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const iveColor = (v) => v >= 0.9 ? '#ef4444' : v >= 0.7 ? '#f59e0b' : '#10b981'
+  const iveLabel = (v) => v >= 0.9 ? 'Alto' : v >= 0.7 ? 'Medio' : 'Bajo'
+  const ttStyle = { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } }
+  const NIV_CLR = { BASICA: '#60a5fa', MEDIA: '#34d399' }
+
+  const prom_ive = data.ive_promedio ?? 0
+  const total_ee = data.total_establecimientos ?? 0
+  const total_mat = data.total_matricula ?? 0
+  const altoVuln = ive_establecimientos.filter(e => (e.ive_sinae ?? 0) >= 0.9).length
+
+  const chartData = [...filtered].sort((a, b) => (b.ive_sinae ?? 0) - (a.ive_sinae ?? 0)).slice(0, 10)
+
+  const iveBarOption = {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' }, ...ttStyle,
+      formatter: params => {
+        const d = chartData[params[0].dataIndex]
+        return `<b>${d.nom_establecimiento}</b> (${d.rbd})<br/>IVE: <b style="color:${iveColor(d.ive_sinae)}">${(d.ive_sinae * 100).toFixed(1)}%</b> — ${iveLabel(d.ive_sinae)}<br/>Nivel: ${d.nivel}<br/>Matrícula: ${fmtN(d.total_matricula)}`
+      }
+    },
+    grid: { left: 270, right: 100, top: 20, bottom: 20 },
+    xAxis: { type: 'value', max: 1, axisLabel: { color: '#94a3b8', formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: chartData.map(d => d.nom_establecimiento.length > 36 ? d.nom_establecimiento.slice(0, 34) + '…' : d.nom_establecimiento), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 260, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barMaxWidth: 18,
+      data: chartData.map(d => ({ value: d.ive_sinae, itemStyle: { color: iveColor(d.ive_sinae), borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', formatter: p => `${(p.value * 100).toFixed(1)}%`, fontSize: 10, color: '#f1f5f9' },
+      markLine: { silent: true, data: [{ xAxis: 0.7, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: '70%', color: '#f59e0b', fontSize: 9 } }, { xAxis: 0.9, lineStyle: { color: '#ef4444', type: 'dashed' }, label: { formatter: '90%', color: '#ef4444', fontSize: 9 } }] }
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  const donaOption = {
+    tooltip: { trigger: 'item', ...ttStyle, formatter: p => `<b>${p.name}</b><br/>Matrícula: ${fmtN(p.value)}<br/>${p.percent.toFixed(1)}%` },
+    legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: '#94a3b8', fontSize: 11 } },
+    series: [{ type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], data: nivel_resumen.map(n => ({ name: n.nivel, value: n.total_matricula, itemStyle: { color: NIV_CLR[n.nivel] ?? '#94a3b8' } })), label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: '#f1f5f9' } } }],
+    backgroundColor: 'transparent',
+  }
+
+  const comunasChart = [...por_comuna].slice(0, 15)
+  const comunaOption = {
+    tooltip: { trigger: 'axis', ...ttStyle, formatter: params => { const d = comunasChart[params[0].dataIndex]; return `<b>${d.nom_comuna}</b><br/>IVE prom: <b>${(d.ive_promedio * 100).toFixed(1)}%</b><br/>EE: ${d.n_establecimientos} · Mat: ${fmtN(d.total_matricula)}` } },
+    grid: { left: 140, right: 80, top: 10, bottom: 10 },
+    xAxis: { type: 'value', max: 1, axisLabel: { color: '#94a3b8', formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: comunasChart.map(d => d.nom_comuna), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 130, overflow: 'truncate' } },
+    series: [{ type: 'bar', barMaxWidth: 18, data: comunasChart.map(d => ({ value: d.ive_promedio, itemStyle: { color: iveColor(d.ive_promedio), borderRadius: [0, 4, 4, 0] } })), label: { show: true, position: 'right', formatter: p => `${(p.value * 100).toFixed(1)}%`, fontSize: 10, color: '#f1f5f9' } }],
+    backgroundColor: 'transparent',
+  }
+
+  const prioData = [
+    { name: '1ª Prioridad', value: prioridades.primera ?? 0, color: '#ef4444' },
+    { name: '2ª Prioridad', value: prioridades.segunda ?? 0, color: '#f59e0b' },
+    { name: '3ª Prioridad', value: prioridades.tercera ?? 0, color: '#facc15' },
+    { name: 'No Priorizado', value: prioridades.no_priorizado ?? 0, color: '#10b981' },
+    { name: 'Sin Info', value: prioridades.sin_informacion ?? 0, color: '#475569' },
+  ]
+  const prioOption = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...ttStyle },
+    legend: { data: prioData.map(d => d.name), textStyle: { color: '#94a3b8', fontSize: 10 }, top: 0 },
+    grid: { left: 20, right: 20, top: 40, bottom: 10 },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtN(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: ['Consolidado'], axisLabel: { color: '#e2e8f0', fontSize: 11 } },
+    series: prioData.map(d => ({ name: d.name, type: 'bar', stack: 'prio', barMaxWidth: 40, data: [d.value], itemStyle: { color: d.color }, label: { show: d.value > 0, position: 'inside', formatter: p => fmtN(p.value), fontSize: 10, color: '#fff', fontWeight: 600 } })),
+    backgroundColor: 'transparent',
+  }
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="🗺️" label="Establec. con IVE" value={fmtN(total_ee)} color="#6366f1" />
+        <KPICard icon="📊" label="IVE Promedio" value={`${(prom_ive * 100).toFixed(1)}%`} color={iveColor(prom_ive)} sub={iveLabel(prom_ive) + ' vulnerabilidad'} />
+        <KPICard icon="🔴" label="IVE Alto (≥90%)" value={fmtN(altoVuln)} color="#ef4444" sub="establecimientos" />
+        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(total_mat)} color="#10b981" />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 240 }} />
+        {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
+        <select value={nivelFilter} onChange={e => setNivelFilter(e.target.value)} style={inpSt}>
+          <option value="all">Nivel: Todos</option>
+          <option value="BASICA">Básica</option>
+          <option value="MEDIA">Media</option>
+        </select>
+        <select value={ruralFilter} onChange={e => setRuralFilter(e.target.value)} style={inpSt}>
+          <option value="all">Ruralidad: Todos</option>
+          <option value="rural">Rural</option>
+          <option value="urbano">Urbano</option>
+        </select>
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Mostrando <b style={{ color: '#94a3b8' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: '#94a3b8' }}>{filtered.length}</b>
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+          <span style={{ color: '#64748b', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage} / {totalPages}</span>
+          <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #1e293b' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Detalle Establecimientos — IVE {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: '#0f172a' }}>
+                {[{h:'RBD',a:'left'},{h:'Nombre',a:'left'},{h:'Nivel',a:'center'},{h:'IVE',a:'center'},{h:'1ª Prior.',a:'right'},{h:'2ª Prior.',a:'right'},{h:'3ª Prior.',a:'right'},{h:'No Prior.',a:'right'},{h:'Total Mat.',a:'right'},{h:'Rural',a:'center'},{h:'Comuna',a:'left'}].map(({h,a})=>(
+                  <th key={h} style={{padding:'0.55rem 0.8rem',color:'#64748b',fontWeight:600,textAlign:a,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={11} style={{padding:'2rem',textAlign:'center',color:'#64748b'}}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => {
+                const ive = ee.ive_sinae ?? 0
+                const clr = iveColor(ive)
+                return (
+                  <tr key={`${ee.rbd}-${ee.nivel}`} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
+                    <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd}</td>
+                    <td style={{padding:'0.45rem 0.8rem',color:'#e2e8f0',maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}><span title={ee.nom_establecimiento}>{ee.nom_establecimiento}</span></td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center'}}>
+                      <span style={{fontSize:'0.7rem',fontWeight:600,color:ee.nivel==='MEDIA'?'#34d399':'#60a5fa',background:ee.nivel==='MEDIA'?'#34d39922':'#60a5fa22',borderRadius:999,padding:'0.15rem 0.5rem',border:`1px solid ${ee.nivel==='MEDIA'?'#34d399':'#60a5fa'}`}}>{ee.nivel}</span>
+                    </td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center'}}>
+                      <span style={{fontSize:'0.78rem',fontWeight:700,color:clr,background:`${clr}22`,border:`1px solid ${clr}`,borderRadius:999,padding:'0.15rem 0.5rem'}}>{(ive*100).toFixed(1)}%</span>
+                    </td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#ef4444',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.primera_prioridad)}</td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#f59e0b',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.segunda_prioridad)}</td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#facc15',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.tercera_prioridad)}</td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.no_priorizado)}</td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#f1f5f9',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.total_matricula)}</td>
+                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center',color:ee.rural_rbd===1?'#f59e0b':'#334155'}}>{ee.rural_rbd===1?'🌿':'·'}</td>
+                    <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontSize:'0.76rem'}}>{ee.nom_comuna}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'0.75rem 1.25rem',borderTop:'1px solid #1e293b',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <span style={{color:'#64748b',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
+          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
+            <span style={{color:'#64748b',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
+            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+        <h3 className="chart-title">Top 10 — IVE por Establecimiento (filtrado) — {periodo}</h3>
+        <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
+          <span style={{color:'#ef4444'}}>■</span> Alto ≥90% &nbsp;<span style={{color:'#f59e0b'}}>■</span> Medio 70–90% &nbsp;<span style={{color:'#10b981'}}>■</span> Bajo &lt;70%
+        </p>
+        {chartData.length===0
+          ? <p style={{color:'#64748b',padding:'2rem',textAlign:'center'}}>Sin datos para mostrar.</p>
+          : <ReactECharts option={iveBarOption} style={{height:Math.max(280,chartData.length*38)}} theme="dark" />
+        }
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
+        <div className="chart-card">
+          <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
+          <ReactECharts option={donaOption} style={{height:220}} theme="dark" />
+          <div style={{marginTop:'0.5rem'}}>
+            {nivel_resumen.map(n=>(
+              <div key={n.nivel} style={{display:'flex',justifyContent:'space-between',padding:'0.3rem 0',borderBottom:'1px solid #1e293b',fontSize:'0.8rem'}}>
+                <span style={{color:NIV_CLR[n.nivel]??'#94a3b8',fontWeight:600}}>{n.nivel}</span>
+                <span style={{color:'#94a3b8'}}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat. · IVE: <b style={{color:iveColor(n.ive_promedio)}}>{(n.ive_promedio*100).toFixed(1)}%</b></span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
+          {comunasChart.length===0
+            ? <p style={{color:'#64748b',textAlign:'center',padding:'2rem'}}>Sin datos.</p>
+            : <ReactECharts option={comunaOption} style={{height:Math.max(220,comunasChart.length*26)}} theme="dark" />
+          }
+        </div>
+      </div>
+
+      <div className="chart-card">
+        <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
+        <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.75rem'}}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
+        <ReactECharts option={prioOption} style={{height:100}} theme="dark" />
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5, 1fr)',gap:'0.75rem',marginTop:'1rem'}}>
+          {prioData.map(p=>(
+            <div key={p.name} style={{textAlign:'center',background:'#0f172a',borderRadius:'0.5rem',padding:'0.6rem',border:'1px solid #1e293b'}}>
+              <div style={{fontSize:'1.2rem',fontWeight:700,color:p.color}}>{fmtN(p.value)}</div>
+              <div style={{fontSize:'0.7rem',color:'#64748b',marginTop:'0.2rem'}}>{p.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function RenderGastoEducativo({ sostId, periodo }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const { fmtAmt: fmt } = useMoneyFmt()
+  const ITEMS_PER_PAGE = 10
+
+  useEffect(() => { setPage(1) }, [search, data, periodo])
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/dashboard/ficha-sostenedor/gasto-educativo?sost_id=${sostId}&periodo=${periodo}`)
+      .then(res => setData(res.data))
+      .catch(err => console.error("Error fetching gasto educativo", err))
+      .finally(() => setLoading(false))
+  }, [sostId, periodo])
+
+  if (loading) return <div className="loading-area"><div className="spinner" /></div>
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💰</div>
+      <p>Sin datos de gasto disponibles para este período.</p>
+    </div>
+  )
+
+  const { gasto_establecimientos = [], gasto_por_cuenta = [], resumen = {} } = data
+
+  const filterText = search.toLowerCase().trim()
+  const filtered = gasto_establecimientos.filter(ee => 
+    (ee.nombre_rbd ?? '').toLowerCase().includes(filterText) ||
+    String(ee.rbd ?? '').includes(filterText)
+  )
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
+  const safePage = Math.min(page, totalPages)
+  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const inpSt = { padding: '0.35rem 0.75rem', backgroundColor: '#0f172a', color: '#f1f5f9', border: '1px solid #334155', borderRadius: '0.375rem', fontSize: '0.8rem' }
+  const pgBtn = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid #334155', borderRadius: '0.375rem', background: dis ? '#0f172a' : '#1e293b', color: dis ? '#475569' : '#e2e8f0', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const ttStyle = { backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9', fontSize: 11 } }
+
+  // Gráfico: Top 10 gastos
+  const chartData = [...filtered].sort((a, b) => (b.total_gasto ?? 0) - (a.total_gasto ?? 0)).slice(0, 10)
+  const barOption = {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' }, ...ttStyle,
+      formatter: params => {
+        const d = chartData[params[0].dataIndex]
+        return `<b>${d.nombre_rbd}</b> ${d.rbd ? `(${d.rbd})` : ''}<br/>Monto: <b style="color:#10b981">${fmt(d.total_gasto)}</b><br/>Documentos: ${fmtN(d.num_documentos)}`
+      }
+    },
+    grid: { left: 270, right: 80, top: 20, bottom: 20 },
+    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmt(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'category', data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: '#e2e8f0', fontSize: 10, width: 260, overflow: 'truncate' } },
+    series: [{
+      type: 'bar', barMaxWidth: 18,
+      data: chartData.map(d => ({ value: d.total_gasto, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } })),
+      label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 10, color: '#f1f5f9' }
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  // Gráfico: Gasto por Cuenta Padre
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b']
+  const cuentaChart = [...gasto_por_cuenta].sort((a, b) => b.total_gasto - a.total_gasto)
+  const pieOption = {
+    tooltip: { trigger: 'item', ...ttStyle, formatter: p => `<b>${p.name}</b><br/>Monto: ${fmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
+    legend: { orient: 'vertical', left: '55%', top: 'center', textStyle: { color: '#94a3b8', fontSize: 10 }, formatter: name => name.length > 40 ? name.slice(0, 38) + '...' : name },
+    series: [{ 
+      type: 'pie', radius: ['40%', '70%'], center: ['25%', '50%'], 
+      data: cuentaChart.map((c, i) => ({ name: c.categoria, value: c.total_gasto, itemStyle: { color: COLORS[i % COLORS.length] } })), 
+      label: { show: false }, emphasis: { label: { show: false } } 
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  return (
+    <>
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.total_centros)} color="#8b5cf6" sub="Establec. + Adm. Central" />
+        <KPICard icon="💵" label="Gasto Total" value={fmt(resumen.total_gasto)} color="#10b981" />
+        <KPICard icon="📄" label="Documentos" value={fmtN(resumen.total_documentos)} color="#3b82f6" />
+        <KPICard icon="📊" label="Promedio por Centro" value={fmt(resumen.total_centros ? resumen.total_gasto / resumen.total_centros : 0)} color="#f59e0b" />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input type="text" placeholder="🔍 Buscar por centro de costo o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
+        {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
+        
+        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+          Mostrando <b style={{ color: '#94a3b8' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: '#94a3b8' }}>{filtered.length}</b>
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+          <span style={{ color: '#64748b', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage} / {totalPages}</span>
+          <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+        </div>
+      </div>
+
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #1e293b' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Gasto por Centro de Costo — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: '#0f172a' }}>
+                {[{h:'RBD',a:'left'},{h:'Nombre / Centro Costo',a:'left'},{h:'Nº Docs',a:'right'},{h:'Rural',a:'center'},{h:'Comuna',a:'left'},{h:'Monto Total',a:'right'}].map(({h,a})=>(
+                  <th key={h} style={{padding:'0.55rem 0.8rem',color:'#64748b',fontWeight:600,textAlign:a,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={6} style={{padding:'2rem',textAlign:'center',color:'#64748b'}}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd || 'N/A'}</td>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#e2e8f0',maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
+                  </td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#94a3b8',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.num_documentos)}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'center',color:ee.rural_rbd===1?'#f59e0b':'#334155'}}>{ee.rural_rbd===1?'🌿':(ee.rbd? '·' : '')}</td>
+                  <td style={{padding:'0.45rem 0.8rem',color:'#94a3b8',fontSize:'0.76rem'}}>{ee.nom_comuna || ''}</td>
+                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmt(ee.total_gasto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{padding:'0.75rem 1.25rem',borderTop:'1px solid #1e293b',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
+          <span style={{color:'#64748b',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
+          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
+            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
+            <span style={{color:'#64748b',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
+            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
+          {chartData.length===0
+            ? <p style={{color:'#64748b',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{height:Math.max(280,chartData.length*38)}} theme="dark" />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
+          <ReactECharts option={pieOption} style={{height:300}} theme="dark" />
+          <div style={{marginTop:'0.5rem', maxHeight:'200px', overflowY:'auto'}}>
+            {cuentaChart.map((c, i) => (
+              <div key={c.categoria} style={{display:'flex',justifyContent:'space-between',padding:'0.3rem 0',borderBottom:'1px solid #1e293b',fontSize:'0.75rem'}}>
+                <span style={{color:COLORS[i % COLORS.length] || '#94a3b8', fontWeight:600, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={c.categoria}>{c.categoria}</span>
+                <span style={{color:'#f1f5f9', fontWeight:600, marginLeft:'0.5rem'}}>{fmt(c.total_gasto)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
