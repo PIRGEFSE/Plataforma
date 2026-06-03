@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMoneda, fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 import HHIFuentes from './HHIFuentes'
 
 // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ function AcreditacionSaldos({ periodo }) {
 
   const anios = [...new Set(data.por_riesgo.map(d => d.periodo))].sort()
   const colorGlobal = riesgoGlobal(data.pct_rendido)
+  const C = useChartColors()
 
   const gaugeOption = {
     series: [{
@@ -76,8 +78,8 @@ function AcreditacionSaldos({ periodo }) {
       pointer: { itemStyle: { color: 'auto' }, length: '60%', width: 6 },
       axisTick: { show: false },
       splitLine: { length: 14, lineStyle: { color: 'auto', width: 2 } },
-      axisLabel: { color: '#94a3b8', fontSize: 11, formatter: v => `${v}%` },
-      title: { offsetCenter: [0, '78%'], color: '#94a3b8', fontSize: 14 },
+      axisLabel: { color: C.axisLabel, fontSize: 11, formatter: v => `${v}%` },
+      title: { offsetCenter: [0, '78%'], color: C.axisLabel, fontSize: 14 },
       detail: { valueAnimation: true, formatter: v => `${v.toFixed(1)}%\nRendido`, color: colorGlobal, fontSize: 22, fontWeight: 700, offsetCenter: [0, '38%'] },
       data: [{ value: data.pct_rendido, name: 'Tasa de Rendición Global' }],
     }],
@@ -88,9 +90,9 @@ function AcreditacionSaldos({ periodo }) {
     tooltip: {
       trigger: 'item',
       formatter: p => `${p.name}<br/>${fmtN(p.value)} registros (${p.percent}%)<br/>${fmtMM(data.global.find(g => g.estado_norm === p.name)?.monto_total ?? 0)}`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: '#94a3b8' } },
+    legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: C.legend.color } },
     series: [{
       type: 'pie', radius: ['42%', '72%'], center: ['40%', '50%'],
       data: [
@@ -105,11 +107,11 @@ function AcreditacionSaldos({ periodo }) {
   }
 
   const barRiesgoOption = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: ${fmtN(s.value)} sostenedores`).join('<br/>')}`, backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' } },
-    legend: { data: NIVELES, textStyle: { color: '#94a3b8' }, top: 0 },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: ${fmtN(s.value)} sostenedores`).join('<br/>')}`, ...C.tooltip },
+    legend: { data: NIVELES, textStyle: { color: C.legend.color }, top: 0 },
     grid: { left: 60, right: 20, top: 50, bottom: 40 },
-    xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtN(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtN(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: NIVELES.map(nivel => ({
       name: nivel, type: 'bar', stack: 'riesgo', barMaxWidth: 60,
       data: anios.map(a => { const row = data.por_riesgo.find(d => d.periodo === a && d.nivel_riesgo === nivel); return row ? row.n_sostenedores : 0 }),
@@ -119,15 +121,16 @@ function AcreditacionSaldos({ periodo }) {
   }
 
   const barMontoOption = {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: ${fmtMM(s.value)}`).join('<br/>')}`, backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' } },
-    legend: { data: NIVELES, textStyle: { color: '#94a3b8' }, top: 0 },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: ${fmtMM(s.value)}`).join('<br/>')}`, ...C.tooltip },
+    legend: { data: NIVELES, textStyle: { color: C.legend.color }, top: 0 },
     grid: { left: 110, right: 20, top: 50, bottom: 40 },
-    xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: NIVELES.map(nivel => ({
       name: nivel, type: 'bar', stack: 'monto', barMaxWidth: 60,
       data: anios.map(a => { const row = data.por_riesgo.find(d => d.periodo === a && d.nivel_riesgo === nivel); return row ? Number(row.monto_no_rendido) : 0 }),
       itemStyle: { color: RIESGO_COLOR[nivel] },
+      label: { show: true, formatter: p => p.value > 0 ? fmtMonedaCorto(p.value) : '', color: '#fff', fontSize: 10 },
     })),
     backgroundColor: 'transparent',
   }
@@ -141,12 +144,12 @@ function AcreditacionSaldos({ periodo }) {
         <KPICard label="Sostenedores en Riesgo Alto/Crítico" value={fmtN((data.sost_por_nivel['Riesgo Alto'] ?? 0) + (data.sost_por_nivel['Riesgo Crítico'] ?? 0))} icon="🔴" color="#ef4444" sub={`Medio: ${fmtN(data.sost_por_nivel['Riesgo Medio'] ?? 0)} · Bajo: ${fmtN(data.sost_por_nivel['Riesgo Bajo'] ?? 0)}`} badge="Alta Vigilancia" />
       </div>
       <div className="charts-grid-2">
-        <div className="chart-card"><h3 className="chart-title">Tasa de Rendición Global</h3><ReactECharts option={gaugeOption} style={{ height: 280 }} theme="dark" /><div style={{ textAlign: 'center', marginTop: -12, fontSize: '0.8rem', color: '#64748b' }}>🟢 ≥90% Bajo · 🟡 70-89% Medio · 🟠 40-69% Alto · 🔴 &lt;40% Crítico</div></div>
-        <div className="chart-card"><h3 className="chart-title">Distribución Rendido vs No Rendido</h3><ReactECharts option={pieOption} style={{ height: 280 }} theme="dark" /></div>
+        <div className="chart-card"><h3 className="chart-title">Tasa de Rendición Global</h3><ReactECharts option={gaugeOption} style={{ height: 280 }} /><div style={{ textAlign: 'center', marginTop: -12, fontSize: '0.8rem', color: 'var(--text-muted)' }}>🟢 ≥90% Bajo · 🟡 70-89% Medio · 🟠 40-69% Alto · 🔴 &lt;40% Crítico</div></div>
+        <div className="chart-card"><h3 className="chart-title">Distribución Rendido vs No Rendido</h3><ReactECharts option={pieOption} style={{ height: 280 }} /></div>
       </div>
       <div className="charts-grid-2">
-        <div className="chart-card"><h3 className="chart-title">Sostenedores por Nivel de Riesgo y Año</h3>{anios.length === 0 ? <div className="empty-state">Sin datos</div> : <ReactECharts option={barRiesgoOption} style={{ height: 320 }} theme="dark" />}</div>
-        <div className="chart-card"><h3 className="chart-title">Monto No Rendido por Nivel de Riesgo y Año (mM$)</h3>{anios.length === 0 ? <div className="empty-state">Sin datos</div> : <ReactECharts option={barMontoOption} style={{ height: 320 }} theme="dark" />}</div>
+        <div className="chart-card"><h3 className="chart-title">Sostenedores por Nivel de Riesgo y Año</h3>{anios.length === 0 ? <div className="empty-state">Sin datos</div> : <ReactECharts option={barRiesgoOption} style={{ height: 320 }} />}</div>
+        <div className="chart-card"><h3 className="chart-title">Monto No Rendido por Nivel de Riesgo y Año (mM$)</h3>{anios.length === 0 ? <div className="empty-state">Sin datos</div> : <ReactECharts option={barMontoOption} style={{ height: 320 }} />}</div>
       </div>
       <div className="chart-card">
         <h3 className="chart-title">Top 20 Sostenedores con Mayor Monto No Rendido</h3>
@@ -158,7 +161,7 @@ function AcreditacionSaldos({ periodo }) {
                 <tr key={`${d.sost_id}-${i}`}>
                   <td><code>{d.sost_id}</code></td>
                   <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${RIESGO_COLOR[d.nivel_riesgo]}20`, color: RIESGO_COLOR[d.nivel_riesgo], padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>{RIESGO_ICON[d.nivel_riesgo]} {d.nivel_riesgo}</span></td>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 60, height: 6, borderRadius: 3, background: '#1e293b', overflow: 'hidden' }}><div style={{ width: `${d.pct_rendido}%`, height: '100%', background: RIESGO_COLOR[d.nivel_riesgo], borderRadius: 3 }} /></div><span style={{ fontSize: '0.82rem' }}>{Number(d.pct_rendido).toFixed(1)}%</span></div></td>
+                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}><div style={{ width: `${d.pct_rendido}%`, height: '100%', background: RIESGO_COLOR[d.nivel_riesgo], borderRadius: 3 }} /></div><span style={{ fontSize: '0.82rem' }}>{Number(d.pct_rendido).toFixed(1)}%</span></div></td>
                   <td style={{ color: '#ef4444', fontWeight: 600 }}>{fmtMM(d.monto_no_rendido)}</td>
                   <td>{fmtMM(d.monto_total)}</td>
                   <td>{fmtN(d.n_no_rendido)}</td>

@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 
 const RIESGO_COLORS = { 'Riesgo Bajo': '#10b981', 'Riesgo Moderado': '#f59e0b', 'Riesgo Alto': '#ef4444' }
 const EF_COLORS = { Optimo: '#10b981', Moderado: '#f59e0b', Elevado: '#ef4444' }
@@ -18,7 +19,7 @@ const ENS_MAP = {
   910:{label:'Media Artística',color:'#f9a8d4'},
 }
 
-function tt() { return { backgroundColor:'#1e293b', borderColor:'#334155', textStyle:{ color:'#f1f5f9', fontSize:11 } } }
+// tt() se llama dentro de componentes que usan useChartColors — ver uso abajo
 
 function KPICard({ icon, label, value, color='#6366f1', sub }) {
   return (
@@ -36,12 +37,12 @@ function KPICard({ icon, label, value, color='#6366f1', sub }) {
 function getEnsenanzas(ee) {
   const claves = ['ens_01','ens_02','ens_03','ens_04','ens_05','ens_06','ens_07','ens_08','ens_09','ens_10','ens_11']
   const unicos = [...new Set(claves.map(k => Number(ee[k]??0)).filter(c=>c>0))]
-  if (!unicos.length) return <span style={{color:'#334155'}}>—</span>
+  if (!unicos.length) return <span style={{color:'var(--text-disabled)'}}>—</span>
   return (
     <div style={{display:'flex',flexWrap:'wrap',gap:'0.2rem'}}>
       {unicos.map(cod => {
-        const e = ENS_MAP[cod]; const lbl = e?.label??`Cod ${cod}`; const clr = e?.color??'#94a3b8'
-        return <span key={cod} style={{fontSize:'0.65rem',fontWeight:600,color:'#0f172a',background:clr,borderRadius:999,padding:'0.1rem 0.4rem'}}>{lbl}</span>
+        const e = ENS_MAP[cod]; const lbl = e?.label??`Cod ${cod}`; const clr = e?.color??'var(--text-secondary)'
+        return <span key={cod} style={{fontSize:'0.65rem',fontWeight:600,color:'#fff',background:clr,borderRadius:999,padding:'0.1rem 0.4rem'}}>{lbl}</span>
       })}
     </div>
   )
@@ -100,7 +101,7 @@ export default function FichaEstablecimiento({ section='perfil' }) {
         <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
           {section === 'subvencion' && (
             <>
-              <span style={{color:'#64748b',fontSize:'0.82rem'}}>Año:</span>
+              <span style={{color:'var(--text-muted)',fontSize:'0.82rem'}}>Año:</span>
               <select className="filter-select" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={{minWidth:100}}>
                 <option value="">Todos</option>
                 {periodos.map(p=><option key={p} value={p}>{p}</option>)}
@@ -108,13 +109,13 @@ export default function FichaEstablecimiento({ section='perfil' }) {
             </>
           )}
           {perfil && (
-            <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'#1e40af22',color:'#60a5fa',border:'1px solid #1e40af',fontSize:'0.78rem',fontWeight:600}}>
+            <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-strong)',fontSize:'0.78rem',fontWeight:600}}>
               🏫 RBD {rbdId}
             </span>
           )}
-          {perfil?.rural_rbd && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'#78350f22',color:'#fbbf24',border:'1px solid #92400e',fontSize:'0.78rem',fontWeight:600}}>🌿 Rural</span>}
-          {perfil?.convenio_pie && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'#3730a322',color:'#818cf8',border:'1px solid #4338ca',fontSize:'0.78rem',fontWeight:600}}>🔵 PIE</span>}
-          {perfil?.pace && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'#6b21a822',color:'#c084fc',border:'1px solid #7e22ce',fontSize:'0.78rem',fontWeight:600}}>🎓 PACE</span>}
+          {perfil?.rural_rbd && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--warning-dim)',color:'var(--warning-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🌿 Rural</span>}
+          {perfil?.convenio_pie && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🔵 PIE</span>}
+          {perfil?.pace && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'rgba(139,92,246,0.10)',color:'#a78bfa',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🎓 PACE</span>}
         </div>
       </div>
 
@@ -156,14 +157,14 @@ function TabPerfil({ perfil, detalleData }) {
             {label:'Convenio PIE',val:perfil.convenio_pie?'Sí':'No',icon:'🔵'},
             {label:'PACE',val:perfil.pace?'Sí':'No',icon:'🎓'},
           ].map(({label,val,icon})=>(
-            <div key={label} style={{background:'#0f172a',borderRadius:'0.5rem',padding:'0.75rem',border:'1px solid #1e293b'}}>
-              <div style={{fontSize:'0.72rem',color:'#64748b',marginBottom:'0.25rem'}}>{icon} {label}</div>
-              <div style={{color:'#e2e8f0',fontWeight:600,fontSize:'0.9rem'}}>{val||'—'}</div>
+            <div key={label} style={{background:'var(--surface-overlay)',borderRadius:'0.5rem',padding:'0.75rem',border:'1px solid var(--line-subtle)'}}>
+              <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.25rem'}}>{icon} {label}</div>
+              <div style={{color:'var(--text-primary)',fontWeight:600,fontSize:'0.9rem'}}>{val||'—'}</div>
             </div>
           ))}
         </div>
         <div style={{marginTop:'1rem'}}>
-          <div style={{fontSize:'0.72rem',color:'#64748b',marginBottom:'0.4rem'}}>🎓 Tipos de Enseñanza</div>
+          <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.4rem'}}>🎓 Tipos de Enseñanza</div>
           {getEnsenanzas(perfil)}
         </div>
       </div>
@@ -173,20 +174,20 @@ function TabPerfil({ perfil, detalleData }) {
           <div style={{overflowX:'auto'}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
               <thead>
-                <tr style={{background:'#0f172a'}}>
+                <tr style={{background:'var(--surface-overlay)'}}>
                   {['Año','Ingresos','Gastos','Superávit'].map(h=>(
-                    <th key={h} style={{padding:'0.6rem 1rem',color:'#64748b',fontWeight:600,textAlign:'right',borderBottom:'1px solid #1e293b'}}>{h}</th>
+                    <th key={h} style={{padding:'0.6rem 1rem',color:'var(--text-muted)',fontWeight:600,textAlign:'right',borderBottom:'1px solid var(--line-default)'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {[...detalleData.financiero_serie].reverse().map((r,i)=>(
-                  <tr key={r.periodo} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
-                    <td style={{padding:'0.5rem 1rem',color:'#94a3b8',textAlign:'right'}}>{r.periodo}</td>
-                    <td style={{padding:'0.5rem 1rem',color:'#10b981',textAlign:'right'}}>{fmtMM(r.ingreso)}</td>
-                    <td style={{padding:'0.5rem 1rem',color:'#ef4444',textAlign:'right'}}>{fmtMM(r.gasto)}</td>
+                  <tr key={r.periodo} style={{borderBottom:'1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{r.periodo}</td>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{fmtMM(r.ingreso)}</td>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--danger)',textAlign:'right'}}>{fmtMM(r.gasto)}</td>
                     <td style={{padding:'0.5rem 1rem',textAlign:'right'}}>
-                      <strong style={{color:Number(r.superavit)>=0?'#10b981':'#ef4444'}}>{fmtMM(r.superavit)}</strong>
+                      <strong style={{color:Number(r.superavit)>=0?'var(--success)':'var(--danger)'}}>{fmtMM(r.superavit)}</strong>
                     </td>
                   </tr>
                 ))}
@@ -202,11 +203,12 @@ function TabPerfil({ perfil, detalleData }) {
 // ── Tab: Financiero (serie temporal) ─────────────────────────────────────────
 function TabFinanciero({ detalleData }) {
   if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
+  const C = useChartColors()
   const { financiero_serie=[], remuneraciones_serie=[] } = detalleData
   const periodos = financiero_serie.map(d=>String(d.periodo))
 
   const barOption = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...tt(),
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
       formatter: params => {
         const p = params[0]?.axisValue
         const d = financiero_serie.find(r=>String(r.periodo)===p)
@@ -214,10 +216,10 @@ function TabFinanciero({ detalleData }) {
         return `<b>${p}</b><br/>📈 Ingreso: ${fmtMM(d.ingreso)}<br/>📉 Gasto: ${fmtMM(d.gasto)}<br/>⚖️ Superávit: <b>${fmtMM(d.superavit)}</b>`
       }
     },
-    legend:{ data:['Ingreso','Gasto'], textStyle:{color:'#94a3b8'}, top:0 },
+    legend:{ data:['Ingreso','Gasto'], textStyle:{color:C.legend.color}, top:0 },
     grid:{ left:80, right:30, top:40, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', axisLabel:{color:'#94a3b8', formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[
       { name:'Ingreso', type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.ingreso)), itemStyle:{color:'#10b981',borderRadius:[4,4,0,0]} },
       { name:'Gasto',   type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.gasto)),   itemStyle:{color:'#ef4444',borderRadius:[4,4,0,0]} },
@@ -226,10 +228,10 @@ function TabFinanciero({ detalleData }) {
   }
 
   const superavitOption = {
-    tooltip:{ trigger:'axis', ...tt(), formatter:params=>{ const d=financiero_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Superávit: <b>${fmtMM(d.superavit)}</b>`:'' } },
+    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=financiero_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Superávit: <b>${fmtMM(d.superavit)}</b>`:'' } },
     grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', axisLabel:{color:'#94a3b8', formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[{ type:'bar', barMaxWidth:40,
       data:financiero_serie.map(d=>({ value:Number(d.superavit), itemStyle:{color:Number(d.superavit)>=0?'#10b981':'#ef4444',borderRadius:[4,4,0,0]} })),
       markLine:{ silent:true, data:[{xAxis:0,lineStyle:{color:'#475569',type:'dashed'}}] },
@@ -238,10 +240,10 @@ function TabFinanciero({ detalleData }) {
   }
 
   const remOption = remuneraciones_serie.length ? {
-    tooltip:{ trigger:'axis', ...tt(), formatter:params=>{ const d=remuneraciones_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Líq. Total: ${fmtMM(d.total_liquido)}<br/>Promedio: $${fmtN(d.promedio_liquido)}`:'' } },
+    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=remuneraciones_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Líq. Total: ${fmtMM(d.total_liquido)}<br/>Promedio: $${fmtN(d.promedio_liquido)}`:'' } },
     grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:remuneraciones_serie.map(d=>String(d.periodo)), axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', axisLabel:{color:'#94a3b8', formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:remuneraciones_serie.map(d=>String(d.periodo)), axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[{ type:'bar', barMaxWidth:40, data:remuneraciones_serie.map(d=>Number(d.total_liquido)), itemStyle:{color:'#f59e0b',borderRadius:[4,4,0,0]},
       label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10, color:'#fde68a'},
     }],
@@ -262,16 +264,16 @@ function TabFinanciero({ detalleData }) {
       </div>
       <div className="chart-card" style={{marginBottom:'1.25rem'}}>
         <h3 className="chart-title">Ingreso vs Gasto por Año (mM$)</h3>
-        <ReactECharts option={barOption} style={{height:320}} theme="dark"/>
+        <ReactECharts option={barOption} style={{height:320}}/>
       </div>
       <div className="chart-card" style={{marginBottom:'1.25rem'}}>
         <h3 className="chart-title">Superávit / Déficit por Año (mM$)</h3>
-        <ReactECharts option={superavitOption} style={{height:280}} theme="dark"/>
+        <ReactECharts option={superavitOption} style={{height:280}}/>
       </div>
       {remOption && (
         <div className="chart-card">
           <h3 className="chart-title">Remuneraciones Líquidas por Año (mM$)</h3>
-          <ReactECharts option={remOption} style={{height:280}} theme="dark"/>
+          <ReactECharts option={remOption} style={{height:280}}/>
         </div>
       )}
     </>
@@ -281,21 +283,22 @@ function TabFinanciero({ detalleData }) {
 // ── Tab: Eficiencia (serie temporal) ─────────────────────────────────────────
 function TabEficiencia({ detalleData }) {
   if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
+  const C = useChartColors()
   const { eficiencia_serie=[] } = detalleData
   const periodos = eficiencia_serie.map(d=>String(d.periodo))
 
   const pct100Option = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...tt(),
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
       formatter:params=>{
         const d=eficiencia_serie[params[0]?.dataIndex]
         if(!d) return ''
         return `<b>${d.periodo}</b><br/><span style="color:#10b981">■</span> Aula: ${d.pct_aula}%<br/><span style="color:#ef4444">■</span> Admin: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}<br/><span style="color:#f59e0b">■</span> Otros: ${d.pct_otros}%`
       }
     },
-    legend:{ data:['Gasto en Aula','Gasto Administrativo','Otros Gastos'], textStyle:{color:'#94a3b8'}, top:0 },
+    legend:{ data:['Gasto en Aula','Gasto Administrativo','Otros Gastos'], textStyle:{color:C.legend.color}, top:0 },
     grid:{ left:60, right:30, top:50, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:'#94a3b8',formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[
       { name:'Gasto en Aula',        type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_aula),  itemStyle:{color:'#10b981'} },
       { name:'Gasto Administrativo', type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_admin), itemStyle:{color:'#ef4444'} },
@@ -305,10 +308,10 @@ function TabEficiencia({ detalleData }) {
   }
 
   const adminOption = {
-    tooltip:{ trigger:'axis', ...tt(), formatter:params=>{ const d=eficiencia_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>% Administrativo: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}`:'' } },
+    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=eficiencia_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>% Administrativo: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}`:'' } },
     grid:{ left:60, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:'#94a3b8',formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[{ type:'bar', barMaxWidth:60,
       data:eficiencia_serie.map(d=>({ value:d.pct_admin, itemStyle:{color:EF_COLORS[d.nivel_eficiencia]??'#94a3b8',borderRadius:[4,4,0,0]} })),
       markLine:{ silent:true, data:[
@@ -335,11 +338,11 @@ function TabEficiencia({ detalleData }) {
         <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
           <span style={{color:'#10b981'}}>■</span> Aula &nbsp;<span style={{color:'#ef4444'}}>■</span> Administrativo &nbsp;<span style={{color:'#f59e0b'}}>■</span> Otros
         </p>
-        <ReactECharts option={pct100Option} style={{height:320}} theme="dark"/>
+        <ReactECharts option={pct100Option} style={{height:320}}/>
       </div>
       <div className="chart-card">
         <h3 className="chart-title">Nivel de Gasto Administrativo por Año (%)</h3>
-        <ReactECharts option={adminOption} style={{height:280}} theme="dark"/>
+        <ReactECharts option={adminOption} style={{height:280}}/>
       </div>
     </>
   )
@@ -348,33 +351,34 @@ function TabEficiencia({ detalleData }) {
 // ── Tab: Riesgo (serie temporal) ─────────────────────────────────────────────
 function TabRiesgo({ detalleData }) {
   if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
+  const C = useChartColors()
   const { acreditacion_serie=[] } = detalleData
   const periodos = acreditacion_serie.map(d=>String(d.periodo))
 
   const acredOption = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...tt(),
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
       formatter:params=>{
         const d=acreditacion_serie[params[0]?.dataIndex]
         if(!d) return ''
         return `<b>${d.periodo}</b><br/>✅ Rendido: ${Number(d.pct_rendido).toFixed(1)}% (${fmtMM(d.monto_rendido)})<br/>❌ No rendido: ${Number(d.pct_no_rendido).toFixed(1)}% (${fmtMM(d.monto_no_rendido)})<br/>Docs: ${d.total_docs} — <b>${d.nivel_riesgo}</b>`
       }
     },
-    legend:{ data:['% Rendido','% No Rendido'], textStyle:{color:'#94a3b8'}, top:0 },
+    legend:{ data:['% Rendido','% No Rendido'], textStyle:{color:C.legend.color}, top:0 },
     grid:{ left:60, right:30, top:50, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:'#94a3b8',formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[
       { name:'% Rendido',    type:'bar', stack:'pct', barMaxWidth:60, data:acreditacion_serie.map(d=>({ value:Number(d.pct_rendido), itemStyle:{color:RIESGO_COLORS[d.nivel_riesgo]??'#10b981'} })) },
-      { name:'% No Rendido', type:'bar', stack:'pct', barMaxWidth:60, data:acreditacion_serie.map(d=>Number(d.pct_no_rendido)), itemStyle:{color:'#1e293b'} },
+      { name:'% No Rendido', type:'bar', stack:'pct', barMaxWidth:60, data:acreditacion_serie.map(d=>Number(d.pct_no_rendido)), itemStyle:{color:C.splitLine} },
     ],
     backgroundColor:'transparent',
   }
 
   const montoOption = {
-    tooltip:{ trigger:'axis', ...tt(), formatter:params=>{ const d=acreditacion_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>No rendido: <b style="color:#ef4444">${fmtMM(d.monto_no_rendido)}</b><br/>Total: ${fmtMM(d.monto_total)}`:'' } },
+    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=acreditacion_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>No rendido: <b style="color:#ef4444">${fmtMM(d.monto_no_rendido)}</b><br/>Total: ${fmtMM(d.monto_total)}`:'' } },
     grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:'#94a3b8'} },
-    yAxis:{ type:'value', axisLabel:{color:'#94a3b8',formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:'#1e293b'}} },
+    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
+    yAxis:{ type:'value', axisLabel:{color:C.axisLabel,formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[{ type:'bar', barMaxWidth:60,
       data:acreditacion_serie.map(d=>({ value:Number(d.monto_no_rendido), itemStyle:{color:RIESGO_COLORS[d.nivel_riesgo]??'#ef4444',borderRadius:[4,4,0,0]} })),
       label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10},
@@ -398,14 +402,14 @@ function TabRiesgo({ detalleData }) {
         <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
           <span style={{color:'#10b981'}}>■</span> Rendido &nbsp;<span style={{color:'#1e293b',border:'1px solid #334155',display:'inline-block',width:12,height:12}}></span> No rendido
         </p>
-        <ReactECharts option={acredOption} style={{height:320}} theme="dark"/>
+        <ReactECharts option={acredOption} style={{height:320}}/>
       </div>
       <div className="chart-card" style={{marginBottom:'1.25rem'}}>
         <h3 className="chart-title">Monto No Rendido por Año (mM$)</h3>
-        <ReactECharts option={montoOption} style={{height:280}} theme="dark"/>
+        <ReactECharts option={montoOption} style={{height:280}}/>
       </div>
       <div className="chart-card" style={{padding:0}}>
-        <div style={{padding:'1rem 1.25rem 0.75rem',borderBottom:'1px solid #1e293b'}}>
+        <div style={{padding:'1rem 1.25rem 0.75rem',borderBottom:'1px solid var(--line-subtle)'}}>
           <h3 className="chart-title" style={{margin:0}}>Detalle por Año</h3>
         </div>
         <div style={{overflowX:'auto'}}>
@@ -419,16 +423,16 @@ function TabRiesgo({ detalleData }) {
             </thead>
             <tbody>
               {[...acreditacion_serie].reverse().map((r,i)=>(
-                <tr key={r.periodo} style={{borderBottom:'1px solid #1e293b',background:i%2===0?'transparent':'#0f172a44'}}>
-                  <td style={{padding:'0.5rem 1rem',color:'#94a3b8',textAlign:'right'}}>{r.periodo}</td>
+                <tr key={r.periodo} style={{borderBottom:'1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{r.periodo}</td>
                   <td style={{padding:'0.5rem 1rem',textAlign:'right'}}>
                     <span style={{fontSize:'0.72rem',fontWeight:600,color:RIESGO_COLORS[r.nivel_riesgo],background:`${RIESGO_COLORS[r.nivel_riesgo]}22`,border:`1px solid ${RIESGO_COLORS[r.nivel_riesgo]}`,borderRadius:999,padding:'0.15rem 0.5rem'}}>{r.nivel_riesgo}</span>
                   </td>
-                  <td style={{padding:'0.5rem 1rem',color:'#10b981',textAlign:'right'}}>{Number(r.pct_rendido).toFixed(1)}%</td>
-                  <td style={{padding:'0.5rem 1rem',color:'#10b981',textAlign:'right'}}>{fmtMM(r.monto_rendido)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'#ef4444',textAlign:'right'}}>{fmtMM(r.monto_no_rendido)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'#e2e8f0',textAlign:'right'}}>{fmtMM(r.monto_total)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'#94a3b8',textAlign:'right'}}>{fmtN(r.total_docs)}</td>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{Number(r.pct_rendido).toFixed(1)}%</td>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{fmtMM(r.monto_rendido)}</td>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--danger)',textAlign:'right'}}>{fmtMM(r.monto_no_rendido)}</td>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--text-primary)',textAlign:'right'}}>{fmtMM(r.monto_total)}</td>
+                  <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{fmtN(r.total_docs)}</td>
                 </tr>
               ))}
             </tbody>
@@ -442,9 +446,10 @@ function TabRiesgo({ detalleData }) {
 // ── Tab: Subvenciones ─────────────────────────────────────────────────────────
 function TabSubvencion({ data, periodo }) {
   if (!data) return null
+  const C = useChartColors()
   const pieOption = {
-    tooltip:{ trigger:'item', formatter:p=>`${p.name}<br/>${fmtMM(p.value)} (${p.percent}%)`, backgroundColor:'#1e293b', borderColor:'#334155', textStyle:{color:'#f1f5f9'} },
-    legend:{ orient:'vertical', right:10, top:'center', textStyle:{color:'#94a3b8'}, formatter:n=>n.length>22?n.slice(0,20)+'...':n },
+    tooltip:{ trigger:'item', formatter:p=>`${p.name}<br/>${fmtMM(p.value)} (${p.percent}%)`, ...C.tooltip },
+    legend:{ orient:'vertical', right:10, top:'center', textStyle:{color:C.legend.color}, formatter:n=>n.length>22?n.slice(0,20)+'...':n },
     series:[{ type:'pie', radius:['40%','70%'], center:['38%','50%'],
       data:data.map((d,i)=>({ name:d.subvencion_alias||'Sin subvención', value:d.monto_total, itemStyle:{color:COLORS[i%COLORS.length]} })),
       label:{show:false}, emphasis:{itemStyle:{shadowBlur:10,shadowOffsetX:0,shadowColor:'rgba(0,0,0,0.5)'}},
@@ -453,13 +458,13 @@ function TabSubvencion({ data, periodo }) {
   }
 
   const barOption = {
-    tooltip:{ trigger:'axis', formatter:p=>`${p[0].name}<br/>${fmtMM(p[0].value)}`, backgroundColor:'#1e293b', borderColor:'#334155', textStyle:{color:'#f1f5f9'} },
+    tooltip:{ trigger:'axis', formatter:p=>`${p[0].name}<br/>${fmtMM(p[0].value)}`, ...C.tooltip },
     grid:{ left:160, right:80, top:20, bottom:30 },
-    xAxis:{ type:'value', axisLabel:{color:'#94a3b8',formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:'#1e293b'}} },
-    yAxis:{ type:'category', data:[...data].reverse().map(d=>d.subvencion_alias||'Sin subvención'), axisLabel:{color:'#94a3b8',width:150,overflow:'truncate'} },
+    xAxis:{ type:'value', axisLabel:{color:C.axisLabel,formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
+    yAxis:{ type:'category', data:[...data].reverse().map(d=>d.subvencion_alias||'Sin subvención'), axisLabel:{color:C.axisLabel,width:150,overflow:'truncate'} },
     series:[{ type:'bar', barMaxWidth:30,
       data:[...data].reverse().map((d,i)=>({ value:d.monto_total, itemStyle:{color:COLORS[(data.length-1-i)%COLORS.length]} })),
-      label:{show:true, position:'right', color:'#94a3b8', formatter:p=>fmtMM(p.value)},
+      label:{show:true, position:'right', color:C.axisLabel, formatter:p=>fmtMM(p.value)},
     }],
     backgroundColor:'transparent',
   }
@@ -478,11 +483,11 @@ function TabSubvencion({ data, periodo }) {
       <div className="charts-grid-2">
         <div className="chart-card">
           <h3 className="chart-title">Distribución Porcentual</h3>
-          <ReactECharts option={pieOption} style={{height:380}} theme="dark"/>
+          <ReactECharts option={pieOption} style={{height:380}}/>
         </div>
         <div className="chart-card">
           <h3 className="chart-title">Monto por Subvención (mM$)</h3>
-          <ReactECharts option={barOption} style={{height:380}} theme="dark"/>
+          <ReactECharts option={barOption} style={{height:380}}/>
         </div>
       </div>
     </>

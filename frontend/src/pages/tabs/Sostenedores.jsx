@@ -59,7 +59,7 @@ export default function Sostenedores() {
       {loading ? <div className="loading-area"><div className="spinner" /></div> : (
         <div className="chart-card" style={{ flex: 1 }}>
           <h3 className="chart-title">Top {limit} Sostenedores por Monto (mM$)</h3>
-          <ReactECharts option={barOption} style={{ height: Math.max(400, sorted.length * 44) }} theme="dark" />
+          <ReactECharts option={barOption} style={{ height: Math.max(400, sorted.length * 44) }} />
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import ThemeToggle from '../components/ThemeToggle'
 import Resumen from './tabs/Resumen'
 import Tendencia from './tabs/Tendencia'
 import Subvencion from './tabs/Subvencion'
@@ -43,7 +44,11 @@ const NAV_ITEMS = [
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('pirgefse-sidebar') !== 'closed')
+  
+  useEffect(() => {
+    localStorage.setItem('pirgefse-sidebar', sidebarOpen ? 'open' : 'closed')
+  }, [sidebarOpen])
 
   const handleLogout = () => { logout(); navigate('/login') }
   const visibleNav = NAV_ITEMS.filter(n => n.roles.includes(user?.role))
@@ -82,6 +87,7 @@ export default function Dashboard() {
         </nav>
 
         <div className="sidebar-footer">
+          <ThemeToggle variant="sidebar" collapsed={!sidebarOpen} />
           <div className="user-info">
             <div className="user-avatar">{user?.username?.[0]?.toUpperCase()}</div>
             {sidebarOpen && (

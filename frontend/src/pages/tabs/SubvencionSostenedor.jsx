@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import { fmtMM, fmtMonedaCorto } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 
 const COLORS = ['#6366f1','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#84cc16']
 
@@ -25,13 +26,15 @@ export default function SubvencionSostenedor() {
       .finally(() => setLoading(false))
   }, [periodo, sostId])
 
+  const C = useChartColors()
+
   const pieOption = {
     tooltip: {
       trigger: 'item',
       formatter: p => `${p.name}<br/>${fmtMM(p.value)} (${p.percent}%)`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: '#94a3b8' }, formatter: n => n.length > 20 ? n.slice(0, 20) + '...' : n },
+    legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: C.legend.color }, formatter: n => n.length > 20 ? n.slice(0, 20) + '...' : n },
     series: [{
       type: 'pie', radius: ['40%', '70%'], center: ['40%', '50%'],
       data: data.map((d, i) => ({ name: d.subvencion_alias || 'Sin subvención', value: d.monto_total, itemStyle: { color: COLORS[i % COLORS.length] } })),
@@ -44,16 +47,16 @@ export default function SubvencionSostenedor() {
     tooltip: {
       trigger: 'axis',
       formatter: p => `${p[0].name}<br/>${fmtMM(p[0].value)}`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
     grid: { left: 130, right: 80, top: 20, bottom: 30 },
-    xAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
-    yAxis: { type: 'category', data: [...data].reverse().map(d => d.subvencion_alias || 'Sin subvención'), axisLabel: { color: '#94a3b8', width: 120, overflow: 'truncate' }, axisLine: { lineStyle: { color: '#334155' } } },
+    xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'category', data: [...data].reverse().map(d => d.subvencion_alias || 'Sin subvención'), axisLabel: { color: C.axisLabel, width: 120, overflow: 'truncate' }, axisLine: { lineStyle: { color: C.axisLine } } },
     series: [{
       type: 'bar',
       data: [...data].reverse().map((d, i) => ({ value: d.monto_total, itemStyle: { color: COLORS[i % COLORS.length] } })),
       barMaxWidth: 30,
-      label: { show: true, position: 'right', color: '#94a3b8', formatter: p => fmtMM(p.value) },
+      label: { show: true, position: 'right', color: C.axisLabel, formatter: p => fmtMM(p.value) },
     }],
     backgroundColor: 'transparent',
   }
@@ -74,11 +77,11 @@ export default function SubvencionSostenedor() {
         <div className="charts-grid-2">
           <div className="chart-card">
             <h3 className="chart-title">Distribución Porcentual</h3>
-            <ReactECharts option={pieOption} style={{ height: 380 }} theme="dark" />
+            <ReactECharts option={pieOption} style={{ height: 380 }} />
           </div>
           <div className="chart-card">
             <h3 className="chart-title">Monto por Subvención (mM$)</h3>
-            <ReactECharts option={barOption} style={{ height: 380 }} theme="dark" />
+            <ReactECharts option={barOption} style={{ height: 380 }} />
           </div>
         </div>
       )}
