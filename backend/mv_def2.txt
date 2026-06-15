@@ -1,0 +1,14 @@
+--- mv_ingreso_depurado ---
+ SELECT sost_id,
+    periodo,
+    sum(monto_declarado) AS ingreso_total
+   FROM estado_resultado
+  WHERE ((desc_tipo_cuenta ~~* '%ingreso%'::text) AND (upper(TRIM(BOTH FROM desc_estado)) = 'RENDIDO'::text) AND (cuenta_alias_padre ~~ '3%'::text) AND (sost_id IS NOT NULL))
+  GROUP BY sost_id, periodo;
+--- mv_rem_por_sost ---
+ SELECT sostenedor AS sost_id,
+    anio AS periodo,
+    sum(monto) AS gasto_rem
+   FROM remuneraciones
+  WHERE ((cuenta_alias = ANY (ARRAY['410101'::text, '410102'::text, '410104'::text, '410105'::text, '410116'::text, '410119'::text, '410121'::text, '410124'::text, '410128'::text, '410129'::text, '410401'::text, '410402'::text, '410403'::text, '410404'::text, '410304'::text, '410309'::text, '410501'::text, '410803'::text])) AND (sostenedor IS NOT NULL))
+  GROUP BY sostenedor, anio;

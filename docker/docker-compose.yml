@@ -4,8 +4,10 @@ services:
     container_name: pirgefse_db
     restart: unless-stopped
     env_file: .env
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Puerto 5432 NO expuesto al host intencionalmente.
+    # La BBDD solo es accesible dentro de la red Docker (pirgefse_net).
+    # Para acceso local de administración usar:
+    #   docker compose exec db psql -U pirgefse -d pirgefse_db
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d:ro
@@ -31,8 +33,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      SECRET_KEY: pirgefse-secret-key-2024-cambiar-en-produccion
-      FRONTEND_URL: http://localhost:3000
+      SECRET_KEY: ${SECRET_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     ports:
       - "8000:8000"
     depends_on:
@@ -54,11 +56,16 @@ services:
       - pirgefse_net
 
   dbgate:
+    # ⚠️  Herramienta de administración — solo para desarrollo local.
+    # En producción NO arrancar: este servicio NO se incluye en el
+    # compose de producción (docker-compose.prod.yml).
+    # Para uso local: docker compose --profile tools up dbgate
+    profiles: ["tools"]
     image: dbgate/dbgate:latest
     container_name: pirgefse_dbgate
     restart: unless-stopped
     ports:
-      - "8081:3000"
+      - "127.0.0.1:8081:3000"
     volumes:
       - dbgate_data:/root/.dbgate
     environment:

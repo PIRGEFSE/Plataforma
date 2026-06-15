@@ -1,0 +1,9 @@
+# pyrefly.toml — Configuración del type-checker Pyrefly para el backend PIRGEFSE
+# Pyrefly busca este archivo automáticamente en la carpeta del proyecto.
+
+# Intérprete Python: apunta al venv para resolver todos los paquetes instalados
+python_interpreter = ".venv/bin/python"
+
+# Rutas donde Pyrefly busca módulos (incluye la raíz del backend para
+# resolver: database, auth, models, config, routes, etc.)
+search_path = ["."]

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 
 export default function Remuneraciones() {
   const [data, setData] = useState(null)
@@ -17,16 +18,18 @@ export default function Remuneraciones() {
   if (loading) return <div className="loading-area"><div className="spinner" /></div>
   if (!data) return null
 
+  const C = useChartColors()
+
   const optAnio = {
     tooltip: {
       trigger: 'axis',
       formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: ${fmtMM(s.value)}`).join('<br/>')}`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { data: ['Promedio Líquido', 'Promedio Haber', 'Promedio Descuento'], textStyle: { color: '#94a3b8' } },
+    legend: { data: ['Promedio Líquido', 'Promedio Haber', 'Promedio Descuento'], textStyle: { color: C.legend.color } },
     grid: { left: 110, right: 20, top: 50, bottom: 30 },
-    xAxis: { type: 'category', data: data.por_anio.map(d => d.anio), axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: data.por_anio.map(d => d.anio), axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: [
       { name: 'Promedio Líquido', type: 'bar', data: data.por_anio.map(d => d.promedio_liquido), itemStyle: { color: '#10b981' }, barGap: '5%', barMaxWidth: 40 },
       { name: 'Promedio Haber', type: 'bar', data: data.por_anio.map(d => d.promedio_haber), itemStyle: { color: '#6366f1' }, barMaxWidth: 40 },
@@ -39,9 +42,9 @@ export default function Remuneraciones() {
     tooltip: {
       trigger: 'item',
       formatter: p => `${p.name}<br/>Registros: ${fmtN(p.value)}`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { textStyle: { color: '#94a3b8' }, orient: 'vertical', right: 10 },
+    legend: { textStyle: { color: C.legend.color }, orient: 'vertical', right: 10 },
     series: [{
       type: 'pie', radius: ['35%', '65%'], center: ['40%', '50%'],
       data: data.por_tipo.map(d => ({ name: d.tip || 'Sin tipo', value: d.n_registros })),
@@ -65,11 +68,11 @@ export default function Remuneraciones() {
       <div className="charts-grid-2">
         <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
           <h3 className="chart-title">Promedio Líquido / Haber / Descuento por Año (mM$)</h3>
-          <ReactECharts option={optAnio} style={{ height: 320 }} theme="dark" />
+          <ReactECharts option={optAnio} style={{ height: 320 }} />
         </div>
         <div className="chart-card">
           <h3 className="chart-title">Distribución por Tipo de Contrato</h3>
-          <ReactECharts option={optTipo} style={{ height: 320 }} theme="dark" />
+          <ReactECharts option={optTipo} style={{ height: 320 }} />
         </div>
         <div className="chart-card">
           <h3 className="chart-title">Resumen por Año</h3>

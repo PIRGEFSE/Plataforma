@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     email: Optional[str]
     role: str
     sost_id: Optional[int] = None
+    rbd_id: Optional[int] = None
     is_active: bool
     created_at: datetime
 
@@ -39,6 +40,7 @@ class UserCreate(BaseModel):
     password: str
     role: str = "viewer"
     sost_id: Optional[int] = None
+    rbd_id: Optional[int] = None
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 

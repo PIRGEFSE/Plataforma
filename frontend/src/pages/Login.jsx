@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
+import ThemeToggle from '../components/ThemeToggle'
 
 export default function Login() {
   const { login } = useAuth()
@@ -25,6 +26,7 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      <ThemeToggle />
       <div className="login-bg" />
       <div className="login-card">
         <div className="login-logo">

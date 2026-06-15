@@ -15,22 +15,35 @@
 --
 -- Fuente: estado_resultado WHERE desc_tipo_cuenta ILIKE '%ingreso%'
 --         AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+--         AND cuenta_alias_padre LIKE '3%'
 --         Clasificado por subvencion_alias por sostenedor y período.
+--
+-- Optimizaciones:
+--   - fuente_principal calculada con ROW_NUMBER() en lugar de
+--     subconsultas correlacionadas (evita O(n²) por grupo)
+--   - Índice en cuenta_alias_padre para acelerar el filtro '3%'
 -- =============================================================
+
+-- ── Índice de apoyo para el nuevo filtro (si no existe) ──────────────────
+CREATE INDEX IF NOT EXISTS idx_er_cuenta_alias_padre
+    ON estado_resultado (cuenta_alias_padre);
 
 -- ── Vista 1: Participación de cada fuente por sostenedor/período ──
 DROP MATERIALIZED VIEW IF EXISTS mv_hhi_fuentes CASCADE;
 
 CREATE MATERIALIZED VIEW mv_hhi_fuentes AS
 WITH ingresos AS (
+    -- Agrega montos por fuente, filtrando solo ingresos rendidos
+    -- con cuenta_alias_padre que inicia con '3'
     SELECT
         sost_id,
         periodo,
         subvencion_alias,
-        SUM(monto_declarado)                AS monto_fuente
+        SUM(monto_declarado) AS monto_fuente
     FROM estado_resultado
-    WHERE desc_tipo_cuenta ILIKE '%ingreso%'
+    WHERE UPPER(TRIM(desc_tipo_cuenta)) LIKE '%INGRESO%'
       AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+      AND cuenta_alias_padre LIKE '3%'
       AND sost_id IS NOT NULL
       AND subvencion_alias IS NOT NULL
       AND subvencion_alias <> ''
@@ -57,33 +70,33 @@ con_participacion AS (
     FROM ingresos i
     JOIN totales t USING (sost_id, periodo)
 ),
+-- Identifica la fuente principal usando ROW_NUMBER (evita subconsultas correlacionadas)
+con_ranking AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY sost_id, periodo
+            ORDER BY pct_participacion DESC, subvencion_alias
+        ) AS rn
+    FROM con_participacion
+),
+fuente_principal AS (
+    SELECT sost_id, periodo, subvencion_alias AS fuente_principal, pct_participacion AS pct_fuente_principal
+    FROM con_ranking
+    WHERE rn = 1
+),
 hhi_calc AS (
     SELECT
-        sost_id,
-        periodo,
+        cp.sost_id,
+        cp.periodo,
         -- HHI = Σ (pct_i)²  en escala 0-10.000
-        ROUND(SUM(POWER(participacion * 100, 2))::NUMERIC, 2)   AS hhi,
-        SUM(monto_fuente)                                        AS monto_total,
-        COUNT(DISTINCT subvencion_alias)                         AS n_fuentes,
-        -- Fuente principal (mayor participación)
-        MAX(subvencion_alias) FILTER (
-            WHERE pct_participacion = (
-                SELECT MAX(cp2.pct_participacion)
-                FROM con_participacion cp2
-                WHERE cp2.sost_id = con_participacion.sost_id
-                  AND cp2.periodo  = con_participacion.periodo
-            )
-        )                                                        AS fuente_principal,
-        MAX(pct_participacion) FILTER (
-            WHERE pct_participacion = (
-                SELECT MAX(cp2.pct_participacion)
-                FROM con_participacion cp2
-                WHERE cp2.sost_id = con_participacion.sost_id
-                  AND cp2.periodo  = con_participacion.periodo
-            )
-        )                                                        AS pct_fuente_principal
-    FROM con_participacion
-    GROUP BY sost_id, periodo
+        ROUND(SUM(POWER(cp.participacion * 100, 2))::NUMERIC, 2) AS hhi,
+        SUM(cp.monto_fuente)                                      AS monto_total,
+        COUNT(DISTINCT cp.subvencion_alias)                       AS n_fuentes,
+        fp.fuente_principal,
+        fp.pct_fuente_principal
+    FROM con_participacion cp
+    JOIN fuente_principal fp USING (sost_id, periodo)
+    GROUP BY cp.sost_id, cp.periodo, fp.fuente_principal, fp.pct_fuente_principal
 ),
 con_riesgo AS (
     SELECT *,
@@ -141,8 +154,9 @@ SELECT
         )::NUMERIC, 2
     )                                               AS pct_participacion_global
 FROM estado_resultado
-WHERE desc_tipo_cuenta ILIKE '%ingreso%'
+WHERE UPPER(TRIM(desc_tipo_cuenta)) LIKE '%INGRESO%'
   AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+  AND cuenta_alias_padre LIKE '3%'
   AND sost_id IS NOT NULL
   AND subvencion_alias IS NOT NULL
   AND subvencion_alias <> ''

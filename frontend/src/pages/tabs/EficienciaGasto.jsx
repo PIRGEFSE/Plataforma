@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMoneda, fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 import InnovacionPedagogica from './InnovacionPedagogica'
 
 // ── Sub-tabs disponibles dentro de Eficiencia del Gasto ───────────────────
@@ -52,6 +53,7 @@ function ConcentracionGasto({ periodo }) {
   }, [periodo])
 
   const anios = [...new Set((data?.por_periodo ?? []).map(d => d.periodo))].sort()
+  const C = useChartColors()
 
   const pieOption = !data ? null : {
     tooltip: {
@@ -79,12 +81,12 @@ function ConcentracionGasto({ periodo }) {
         const lines = p.map(s => `${s.marker}${s.seriesName}: ${fmtMM(s.value)} (${total > 0 ? ((s.value/total)*100).toFixed(1) : 0}%)`).join('<br/>')
         return `${p[0].name}<br/>${lines}<br/><b>Total: ${fmtMM(total)}</b>`
       },
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { data: CATEGORIAS, textStyle: { color: '#94a3b8' }, top: 0 },
+    legend: { data: CATEGORIAS, textStyle: { color: C.legend.color }, top: 0 },
     grid: { left: 110, right: 20, top: 50, bottom: 40 },
-    xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: CATEGORIAS.map(cat => ({
       name: cat, type: 'bar', stack: 'gasto', barMaxWidth: 70,
       data: anios.map(a => { const row = data.por_periodo.find(d => d.periodo === a && d.categoria_gasto === cat); return row ? row.monto_total : 0 }),
@@ -97,12 +99,12 @@ function ConcentracionGasto({ periodo }) {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' },
       formatter: p => `${p[0].name}<br/>${p.map(s => `${s.marker}${s.seriesName}: <b>${s.value?.toFixed(1)}%</b>`).join('<br/>')}`,
-      backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
+      ...C.tooltip,
     },
-    legend: { data: CATEGORIAS, textStyle: { color: '#94a3b8' }, top: 0 },
+    legend: { data: CATEGORIAS, textStyle: { color: C.legend.color }, top: 0 },
     grid: { left: 60, right: 20, top: 50, bottom: 40 },
-    xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', max: 100, axisLabel: { color: '#94a3b8', formatter: v => `${v}%` }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: v => `${v}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: CATEGORIAS.map(cat => ({
       name: cat, type: 'bar', stack: 'pct', barMaxWidth: 70,
       data: anios.map(a => {
@@ -130,11 +132,11 @@ function ConcentracionGasto({ periodo }) {
         <KPICard label="Ratio Aula / Administración" value={data.ratio_aula_admin != null ? `${data.ratio_aula_admin.toFixed(2)}x` : '—'} icon="⚖️" color="#6366f1" sub="Por cada peso en admin., cuántos van al aula" badge={data.ratio_aula_admin > 2 ? 'Favorable' : data.ratio_aula_admin > 1 ? 'Moderado' : 'Crítico'} />
       </div>
       <div className="charts-grid-2">
-        <div className="chart-card"><h3 className="chart-title">Distribución del Gasto por Categoría</h3><ReactECharts option={pieOption} style={{ height: 360 }} theme="dark" /></div>
-        <div className="chart-card"><h3 className="chart-title">Proporción del Gasto por Año (%)</h3><ReactECharts option={bar100Option} style={{ height: 360 }} theme="dark" /></div>
+        <div className="chart-card"><h3 className="chart-title">Distribución del Gasto por Categoría</h3><ReactECharts option={pieOption} style={{ height: 360 }} /></div>
+        <div className="chart-card"><h3 className="chart-title">Proporción del Gasto por Año (%)</h3><ReactECharts option={bar100Option} style={{ height: 360 }} /></div>
         <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
           <h3 className="chart-title">Monto del Gasto por Categoría y Año (mM$)</h3>
-          {anios.length === 0 ? <div className="empty-state">Sin datos para el período</div> : <ReactECharts option={barOption} style={{ height: 320 }} theme="dark" />}
+          {anios.length === 0 ? <div className="empty-state">Sin datos para el período</div> : <ReactECharts option={barOption} style={{ height: 320 }} />}
         </div>
       </div>
       <div className="chart-card">

@@ -210,7 +210,7 @@ export default function Resumen() {
                 Evolución Mensual del Monto de Documentos (mM$)
                 {periodo ? ` — ${periodo}` : ' — 2020 a 2024'}
               </h3>
-              <ReactECharts option={sparkOption} style={{ height: 160 }} theme="dark" />
+              <ReactECharts option={sparkOption} style={{ height: 160 }} />
             </div>
           )}
         </>

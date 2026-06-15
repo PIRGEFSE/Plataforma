@@ -46,10 +46,12 @@ async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db), _
     exists = await db.execute(select(func.count()).where(User.username == payload.username))
     if exists.scalar() > 0:
         raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
-    if payload.role not in ("admin", "viewer", "sostenedor"):
-        raise HTTPException(status_code=400, detail="El rol debe ser 'admin', 'viewer' o 'sostenedor'")
+    if payload.role not in ("admin", "viewer", "sostenedor", "establecimiento"):
+        raise HTTPException(status_code=400, detail="El rol debe ser 'admin', 'viewer', 'sostenedor' o 'establecimiento'")
     if payload.role == "sostenedor" and not payload.sost_id:
         raise HTTPException(status_code=400, detail="El rol 'sostenedor' requiere un sost_id")
+    if payload.role == "establecimiento" and not payload.rbd_id:
+        raise HTTPException(status_code=400, detail="El rol 'establecimiento' requiere un rbd_id")
 
     user = User(
         username=payload.username,
@@ -57,6 +59,7 @@ async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db), _
         password_hash=hash_password(payload.password),
         role=payload.role,
         sost_id=payload.sost_id if payload.role == "sostenedor" else None,
+        rbd_id=payload.rbd_id if payload.role == "establecimiento" else None,
     )
     db.add(user)
     await db.commit()
