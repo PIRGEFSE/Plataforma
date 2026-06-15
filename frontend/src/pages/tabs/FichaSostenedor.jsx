@@ -4,6 +4,9 @@ import api from '../../lib/api'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useAuth } from '../../hooks/useAuth'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
+import GastoRemIngresoEstablecimiento from './GastoRemIngresoEstablecimiento'
+import AnalisisRendicion from './AnalisisRendicion'
+import SNEDSostenedor from './SNEDSostenedor'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const RIESGO_COLORS = {
@@ -134,15 +137,16 @@ function shortName(nom, rbd) {
 // tt() removed
 
 // ── Contexto de formato monetario ─────────────────────────────────────────
-const MoneyFmtCtx = createContext({ fmtAmt: fmtMM, fmtAxisAmt: fmtMonedaCorto, unitLabel: 'mM$' })
-const useMoneyFmt = () => useContext(MoneyFmtCtx)
+export const MoneyFmtCtx = createContext({ fmtAmt: fmtMM, fmtAxisAmt: fmtMonedaCorto, unitLabel: 'mM$' })
+export const useMoneyFmt = () => useContext(MoneyFmtCtx)
 
 const SECTION_TITLES = {
   perfil: { icon: '🏛️', label: 'Mi Ficha' },
   financiero: { icon: '💵', label: 'Financiero — Comparación por Establecimiento' },
+  educativo_financiero: { icon: '📊', label: 'Educativo — Financiero por Establecimiento' },
   eficiencia: { icon: '⚙️', label: 'Eficiencia del Gasto — por Establecimiento' },
-  sostenibilidad: { icon: '🛡️', label: 'Sostenibilidad — por Establecimiento' },
-  riesgo: { icon: '📊', label: 'Riesgo — por Establecimiento' },
+  sostenibilidad_riesgo: { icon: '🛡️', label: 'Sostenibilidad y Riesgo — por Establecimiento' },
+  comportamiento_financiero: { icon: '📈', label: 'Comportamiento Financiero — por Establecimiento' },
   territorio: { icon: '🗺️', label: 'Territorio — IVE por Establecimiento' },
 }
 
@@ -304,9 +308,10 @@ export default function FichaSostenedor({ section = 'perfil' }) {
           ? <div className="loading-area"><div className="spinner" /></div>
           : <>
             {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
+            {section === 'educativo_financiero' && <TabEducativoFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} />}
             {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} />}
-            {section === 'sostenibilidad' && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
-            {section === 'riesgo' && <TabRiesgo rdbData={rdbData} periodo={periodo} />}
+            {section === 'sostenibilidad_riesgo' && <TabSostenibilidadRiesgo rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+            {section === 'comportamiento_financiero' && <TabComportamientoFinanciero periodo={periodo} sostId={sostId} />}
           </>
       )}
 
@@ -503,6 +508,68 @@ function TabPerfil({ perfil, establecimientos, financiero_rbd = [], loadingRbd }
   )
 }
 
+// ── Tab: Educativo – Financiero (contenedor con sub-tabs) ────────────────────────
+// El sub-tab "Ingreso - Gasto" muestra el contenido de TabFinanciero.
+// Se pueden agregar más sub-tabs aquí en el futuro.
+function TabEducativoFinanciero({ rdbData, periodo, sostId }) {
+  const [subTab, setSubTab] = useState(
+    () => localStorage.getItem('pirgefse-fichasost-educativo-financiero') || 'ingreso_gasto'
+  )
+  useEffect(() => {
+    localStorage.setItem('pirgefse-fichasost-educativo-financiero', subTab)
+  }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-fichasost-educativo-financiero') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+
+  const SUB_TABS = [
+    { key: 'ingreso_gasto', label: 'Ingreso - Gasto', icon: '💵', color: '#10b981' },
+    { key: 'sned',         label: 'SNED',            icon: '🏆', color: '#6366f1' },
+  ]
+
+  return (
+    <div>
+      <div style={{
+        display: 'flex', gap: '0.5rem', marginBottom: '1.5rem',
+        borderBottom: '2px solid var(--line-subtle)', paddingBottom: '0',
+      }}>
+        {SUB_TABS.map(t => {
+          const active = subTab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setSubTab(t.key)}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '0.375rem 0.375rem 0 0',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                background: active ? t.color : 'transparent',
+                color: active ? '#fff' : 'var(--text-muted)',
+                border: 'none',
+                borderBottom: active ? `2px solid ${t.color}` : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.18s',
+                marginBottom: '-2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>{t.icon}</span> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {subTab === 'ingreso_gasto' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'sned'         && <SNEDSostenedor sostId={sostId} periodo={periodo} />}
+    </div>
+  )
+}
+
 // ── Tab: Financiero por RBD ────────────────────────────────────────────────────
 function TabFinanciero({ rdbData, periodo }) {
   const C = useChartColors()
@@ -688,6 +755,11 @@ function TabEficiencia({ rdbData, periodo, sostId }) {
   const C = useChartColors()
   const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-eficiencia') || 'innovacion')
   useEffect(() => { localStorage.setItem('pirgefse-fichasost-eficiencia', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-fichasost-eficiencia') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
 
   return (
     <div>
@@ -1468,11 +1540,340 @@ function TabRiesgo({ rdbData, periodo }) {
 }
 
 
+// ── Tab: Sostenibilidad y Riesgo (con sub-tabs) ─────────────────────────────────────
+function TabSostenibilidadRiesgo({ rdbData, periodo, sostId }) {
+  const [subTab, setSubTab] = useState(
+    () => localStorage.getItem('pirgefse-fichasost-sostenibilidad-riesgo') || 'acreditacion'
+  )
+  useEffect(() => {
+    localStorage.setItem('pirgefse-fichasost-sostenibilidad-riesgo', subTab)
+  }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-fichasost-sostenibilidad-riesgo') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+
+  const SUB_TABS = [
+    { key: 'acreditacion',  label: 'Acreditación de Saldos',      icon: '📊', color: '#6366f1' },
+    { key: 'sostenibilidad', label: 'Sostenibilidad Rem./Ingreso', icon: '🛡️', color: '#10b981' },
+    { key: 'hhi',           label: 'HHI de Fuentes de Ingreso',   icon: '💰', color: '#f59e0b' },
+  ]
+
+  return (
+    <div>
+      {/* Sub-tab bar */}
+      <div style={{
+        display: 'flex', gap: '0.5rem', marginBottom: '1.5rem',
+        borderBottom: '2px solid var(--line-subtle)', paddingBottom: '0',
+      }}>
+        {SUB_TABS.map(t => {
+          const active = subTab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setSubTab(t.key)}
+              style={{
+                padding: '0.55rem 1.1rem',
+                borderRadius: '0.375rem 0.375rem 0 0',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                background: active ? t.color : 'transparent',
+                color: active ? '#fff' : 'var(--text-muted)',
+                border: 'none',
+                borderBottom: active ? `2px solid ${t.color}` : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.18s',
+                marginBottom: '-2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>{t.icon}</span> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {subTab === 'acreditacion'   && <TabRiesgo rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'sostenibilidad'  && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'hhi'             && <RenderHHISostenedor sostId={sostId} periodo={periodo} />}
+    </div>
+  )
+}
+
+// ── Sub-tab: HHI de Fuentes de Ingreso (vista sostenedor) ───────────────────
+const HHI_COLOR_MAP = {
+  'Concentración Baja':     '#10b981',
+  'Concentración Moderada': '#f59e0b',
+  'Concentración Alta':     '#ef4444',
+}
+const FUENTE_COLOR_SOST = {
+  GENERAL: '#6366f1', SEP: '#10b981', PIE: '#f59e0b', ACG: '#06b6d4',
+  MANTENIMIENTO: '#8b5cf6', PRORETENCION: '#ec4899', INTERNADO: '#14b8a6', AC: '#f97316',
+}
+const FUENTE_COLOR_DEF = ['#84cc16','#a78bfa','#fb923c','#38bdf8','#fb7185']
+function getFColor(alias, i) { return FUENTE_COLOR_SOST[alias] ?? FUENTE_COLOR_DEF[i % FUENTE_COLOR_DEF.length] }
+function hhiLabel(hhi) {
+  if (hhi < 1500) return { label: 'Concentración Baja',     color: '#10b981', icon: '🟢' }
+  if (hhi < 2500) return { label: 'Concentración Moderada', color: '#f59e0b', icon: '🟡' }
+  return              { label: 'Concentración Alta',     color: '#ef4444', icon: '🔴' }
+}
+
+function RenderHHISostenedor({ sostId, periodo }) {
+  const { fmtAmt } = useMoneyFmt()
+  const C = useChartColors()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const sid = sostId ?? 69110400
+
+  useEffect(() => {
+    setLoading(true)
+    const p = periodo ? `&periodo=${periodo}` : ''
+    api.get(`/dashboard/hhi-fuentes-sostenedor?sost_id=${sid}${p}`)
+      .then(r => setData(r.data))
+      .finally(() => setLoading(false))
+  }, [sid, periodo])
+
+  if (loading) return <div className="loading-area"><div className="spinner" /></div>
+  if (!data || data.hhi_serie.length === 0)
+    return <div className="empty-state" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+      Sin datos HHI para este sostenedor.
+    </div>
+
+  const { hhi_serie, fuentes, avg_hhi, ultimo } = data
+  const anios = hhi_serie.map(d => d.periodo)
+  const hLabel = hhiLabel(avg_hhi)
+  const ulLabel = ultimo ? hhiLabel(Number(ultimo.hhi)) : hLabel
+
+  // ── Torta de fuentes (último período disponible)
+  const pieFuentesOpt = {
+    tooltip: {
+      trigger: 'item',
+      formatter: p => `${p.name}<br/>${fmtAmt(p.value)}<br/><b>${p.percent}%</b> del ingreso total`,
+      backgroundColor: 'var(--surface-raised)', borderColor: 'var(--line-subtle)',
+      textStyle: { color: 'var(--text-primary)' },
+    },
+    legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: C.axisLabel, fontSize: 11 } },
+    series: [{
+      type: 'pie', radius: ['40%', '70%'], center: ['38%', '50%'],
+      data: fuentes.map((f, i) => ({ name: f.subvencion_alias, value: Number(f.monto_total), itemStyle: { color: getFColor(f.subvencion_alias, i) } })),
+      label: { show: true, formatter: p => p.percent > 3 ? `${p.percent}%` : '', fontSize: 10, color: C.axisLabel },
+      itemStyle: { borderRadius: 4, borderColor: 'transparent', borderWidth: 1 },
+      emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } },
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  // ── Línea: evolución del HHI por año
+  const lineHHIOpt = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: p => {
+        const d = hhi_serie[p[0].dataIndex]
+        const lbl = hhiLabel(Number(d.hhi))
+        return `<b>${d.periodo}</b><br/>HHI: <b style="color:${lbl.color}">${Math.round(Number(d.hhi))}</b> — ${lbl.label}`
+      },
+      backgroundColor: 'var(--surface-raised)', borderColor: 'var(--line-subtle)',
+      textStyle: { color: 'var(--text-primary)' },
+    },
+    grid: { left: 60, right: 20, top: 30, bottom: 40 },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: {
+      type: 'value', min: 0, max: 10000,
+      axisLabel: { color: C.axisLabel, formatter: v => fmtN(v) },
+      splitLine: { lineStyle: { color: C.splitLine } },
+    },
+    series: [{
+      type: 'line', smooth: true, symbol: 'circle', symbolSize: 8,
+      data: hhi_serie.map(d => ({ value: Number(d.hhi), itemStyle: { color: hhiLabel(Number(d.hhi)).color } })),
+      lineStyle: { color: '#6366f1', width: 3 },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#6366f140' }, { offset: 1, color: 'transparent' }] } },
+      markLine: {
+        silent: true, data: [
+          { yAxis: 1500, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: 'HHI 1.500', color: '#f59e0b', fontSize: 10 } },
+          { yAxis: 2500, lineStyle: { color: '#ef4444', type: 'dashed' }, label: { formatter: 'HHI 2.500', color: '#ef4444', fontSize: 10 } },
+        ],
+      },
+      label: { show: true, formatter: p => p.value != null ? fmtN(Math.round(p.value)) : '', color: C.axisLabel, fontSize: 10 },
+    }],
+    backgroundColor: 'transparent',
+  }
+
+  // ── Barras apiladas: composición de fuentes por año
+  const fuentesKeys = [...new Set(
+    hhi_serie.flatMap(() => fuentes.map(f => f.subvencion_alias))
+  )]
+  const barFuenteOpt = {
+    tooltip: {
+      trigger: 'axis', axisPointer: { type: 'shadow' },
+      backgroundColor: 'var(--surface-raised)', borderColor: 'var(--line-subtle)',
+      textStyle: { color: 'var(--text-primary)' },
+    },
+    legend: { data: fuentes.map(f => f.subvencion_alias), textStyle: { color: C.axisLabel, fontSize: 10 }, top: 0, type: 'scroll' },
+    grid: { left: 60, right: 20, top: 50, bottom: 40 },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: fuentes.map((f, i) => ({
+      name: f.subvencion_alias, type: 'bar', stack: 'fuentes', barMaxWidth: 60,
+      data: anios.map(a => {
+        // For multi-year view, use hhi_serie monto_total as proxy (data already aggregated by sost)
+        // exact per-year per-fuente would require extra endpoint; use fuentes monto for current period
+        return a === (ultimo?.periodo) ? Number(f.monto_total) : null
+      }),
+      itemStyle: { color: getFColor(f.subvencion_alias, i) },
+    })),
+    backgroundColor: 'transparent',
+  }
+
+  return (
+    <>
+      {/* KPIs */}
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <div className="kpi-card" style={{ '--accent': hLabel.color }}>
+          <div className="kpi-icon" style={{ background: `${hLabel.color}20` }}>{hLabel.icon}</div>
+          <div className="kpi-body">
+            <div className="kpi-value" style={{ color: hLabel.color }}>{fmtN(Math.round(avg_hhi))}</div>
+            <div className="kpi-label">HHI Promedio Histórico</div>
+            <div className="kpi-sub">Escala 0–10.000 — menor es más diversificado</div>
+          </div>
+        </div>
+        <div className="kpi-card" style={{ '--accent': ulLabel.color }}>
+          <div className="kpi-icon" style={{ background: `${ulLabel.color}20` }}>{ulLabel.icon}</div>
+          <div className="kpi-body">
+            <div className="kpi-value" style={{ color: ulLabel.color }}>{ultimo ? fmtN(Math.round(Number(ultimo.hhi))) : '—'}</div>
+            <div className="kpi-label">HHI Último Período ({ultimo?.periodo ?? '—'})</div>
+            <div className="kpi-sub">{ulLabel.label}</div>
+          </div>
+        </div>
+        <div className="kpi-card" style={{ '--accent': '#6366f1' }}>
+          <div className="kpi-icon" style={{ background: '#6366f120' }}>📊</div>
+          <div className="kpi-body">
+            <div className="kpi-value" style={{ color: '#6366f1' }}>{fmtN(ultimo?.n_fuentes ?? fuentes.length)}</div>
+            <div className="kpi-label">Número de Fuentes</div>
+            <div className="kpi-sub">Tipos de subvención como ingreso rendido</div>
+          </div>
+        </div>
+        <div className="kpi-card" style={{ '--accent': '#10b981' }}>
+          <div className="kpi-icon" style={{ background: '#10b98120' }}>🏆</div>
+          <div className="kpi-body">
+            <div className="kpi-value" style={{ color: '#10b981' }}>{ultimo?.fuente_principal ?? '—'}</div>
+            <div className="kpi-label">Fuente Principal ({ultimo?.periodo ?? '—'})</div>
+            <div className="kpi-sub">{ultimo?.pct_fuente_principal != null ? `${Number(ultimo.pct_fuente_principal).toFixed(1)}% del ingreso total` : '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Nota metodológica */}
+      <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
+        ℹ️ <strong>Metodología HHI:</strong> HHI = Σ(pct_i²) en escala 0-10.000.
+        <span style={{ marginLeft: 12 }}>🟢 &lt;1.500 Concentración Baja</span>
+        <span style={{ marginLeft: 10 }}>🟡 1.500-2.500 Moderada</span>
+        <span style={{ marginLeft: 10 }}>🔴 &gt;2.500 Alta — alta vulnerabilidad financiera</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+        {/* Torta de fuentes */}
+        <div className="chart-card">
+          <h3 className="chart-title">Distribución de Fuentes de Ingreso</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Período {ultimo?.periodo ?? ''} — datos rendidos</p>
+          <ReactECharts option={pieFuentesOpt} style={{ height: 320 }} />
+        </div>
+
+        {/* Línea HHI histórico */}
+        <div className="chart-card">
+          <h3 className="chart-title">Evolución del HHI por Año</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Concentración de financiamiento — serie histórica</p>
+          <ReactECharts option={lineHHIOpt} style={{ height: 320 }} />
+        </div>
+      </div>
+
+      {/* Tabla de fuentes */}
+      <div className="chart-card">
+        <h3 className="chart-title">Composición de Fuentes de Ingreso (Rendido)</h3>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Fuente (Subvención)</th>
+                <th>Monto Total</th>
+                <th>% Participación</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fuentes.map((f, i) => (
+                <tr key={f.subvencion_alias}>
+                  <td>
+                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: getFColor(f.subvencion_alias, i), marginRight: 8 }} />
+                    {f.subvencion_alias}
+                  </td>
+                  <td style={{ color: '#10b981' }}>{fmtAmt(f.monto_total)}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 80, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(Number(f.pct_participacion), 100)}%`, height: '100%', background: getFColor(f.subvencion_alias, i), borderRadius: 3 }} />
+                      </div>
+                      <strong style={{ color: getFColor(f.subvencion_alias, i) }}>
+                        {Number(f.pct_participacion).toFixed(1)}%
+                      </strong>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Serie temporal detallada */}
+      <div className="chart-card">
+        <h3 className="chart-title">Detalle HHI por Período</h3>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Año</th><th>HHI</th><th>Nivel</th><th>N° Fuentes</th>
+                <th>Fuente Principal</th><th>% F. Principal</th><th>Monto Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...hhi_serie].reverse().map(d => {
+                const lbl = hhiLabel(Number(d.hhi))
+                return (
+                  <tr key={d.periodo}>
+                    <td><strong>{d.periodo}</strong></td>
+                    <td><strong style={{ color: lbl.color, fontSize: '1rem' }}>{fmtN(Math.round(Number(d.hhi)))}</strong></td>
+                    <td>
+                      <span style={{ display:'inline-flex', alignItems:'center', gap:6, background:`${lbl.color}20`, color:lbl.color, padding:'2px 10px', borderRadius:999, fontSize:'0.78rem', fontWeight:600 }}>
+                        {lbl.icon} {lbl.label}
+                      </span>
+                    </td>
+                    <td>{Number(d.n_fuentes).toFixed(0)}</td>
+                    <td>{d.fuente_principal ?? '—'}</td>
+                    <td>{d.pct_fuente_principal != null ? `${Number(d.pct_fuente_principal).toFixed(1)}%` : '—'}</td>
+                    <td style={{ color: '#6366f1' }}>{fmtAmt(d.monto_total)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Tab: Territorio (Sub-tabs) ──────────────────────────────────────────────────
 function TabTerritorio({ data, periodo, sostId }) {
   const C = useChartColors()
   const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-territorio') || 'complejidad')
   useEffect(() => { localStorage.setItem('pirgefse-fichasost-territorio', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-fichasost-territorio') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
   
   return (
     <div>
@@ -1902,5 +2303,49 @@ function RenderGastoEducativo({ sostId, periodo }) {
         </div>
       </div>
     </>
+  )
+}
+
+// ── Tab: Comportamiento Financiero (Sub-tabs) ──────────────────────────────────────────────────
+function TabComportamientoFinanciero({ periodo, sostId }) {
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-comportamiento') || 'gasto_rem')
+  useEffect(() => { localStorage.setItem('pirgefse-fichasost-comportamiento', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-fichasost-comportamiento') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+
+  const SUB_TABS = [
+    { key: 'gasto_rem',          label: 'Gastos Rem. sobre Ingreso Dep.',  icon: '📈', color: '#f59e0b' },
+    { key: 'analisis_rendicion', label: 'Análisis Rendición',              icon: '📋', color: '#6366f1' },
+  ]
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--line-subtle)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        {SUB_TABS.map(t => {
+          const active = subTab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setSubTab(t.key)}
+              style={{
+                padding: '0.5rem 1rem', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.9rem',
+                background: active ? t.color : 'transparent',
+                color: active ? '#fff' : 'var(--text-muted)',
+                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+              }}
+            >
+              <span>{t.icon}</span> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {subTab === 'gasto_rem'          && <GastoRemIngresoEstablecimiento sostId={sostId} periodo={periodo} />}
+      {subTab === 'analisis_rendicion' && <AnalisisRendicion sostId={sostId} periodo={periodo} />}
+    </div>
   )
 }

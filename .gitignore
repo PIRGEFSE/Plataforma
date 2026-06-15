@@ -1,8 +1,14 @@
 # Entorno virtual Python
 .venv/
 
-# Archivos de entorno
+# Archivos de entorno (desarrollo y producción — NUNCA en git)
 .env
+docker/.env
+docker/.env.production
+
+# Dumps de base de datos — archivos pesados
+docker/*.dump
+docker/dumps/
 
 __pycache__/
 *.pyc
@@ -11,8 +17,11 @@ __pycache__/
 *.egg-info/
 *.log
 .DS_Store
-
+*.md
 # Carpeta de builds
 dist/
 build/
 BBDD/
+
+# Chunks temporales de importación
+tmp_chunks/

@@ -55,6 +55,7 @@ SELECT
 FROM estado_resultado
 WHERE desc_tipo_cuenta ILIKE '%ingreso%'
   AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+  AND cuenta_alias_padre LIKE '3%'
   AND sost_id IS NOT NULL
 GROUP BY sost_id, periodo;
 
