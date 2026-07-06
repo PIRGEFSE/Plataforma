@@ -4,6 +4,7 @@ import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useMoneyFmt } from './FichaSostenedor'
+import SqlViewer from '../../components/SqlViewer'
 
 // ── Paleta de niveles de riesgo ───────────────────────────────────────────
 const RIESGO_COLOR = {
@@ -168,8 +169,72 @@ export default function GastoRemIngresoEstablecimiento({ sostId, periodo }) {
     border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', fontSize: '0.8rem', minWidth: 220,
   }
 
+  const sqlStr = `WITH rem AS (
+    SELECT COALESCE(rbd, -1) AS rbd,
+           anio AS periodo,
+           SUM(monto) AS gasto_rem
+    FROM remuneraciones
+    WHERE sostenedor = :sid
+      AND cuenta_alias IN ('410101', '410102', '410104', '410105', '410116', '410119', '410121', '410124', '410128', '410129', '410401', '410402', '410403', '410404', '410304', '410309', '410501', '410803')
+    GROUP BY COALESCE(rbd, -1), anio
+),
+ing AS (
+    SELECT COALESCE(rbd, -1) AS rbd,
+           periodo,
+           SUM(monto_declarado) AS ingreso_total
+    FROM estado_resultado
+    WHERE sost_id = :sid
+      AND desc_tipo_cuenta ILIKE '%ingreso%'
+      AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+      AND cuenta_alias_padre LIKE '3%'
+    GROUP BY COALESCE(rbd, -1), periodo
+),
+joined AS (
+    SELECT COALESCE(r.rbd, i.rbd) AS rbd,
+           COALESCE(r.periodo, i.periodo) AS periodo,
+           COALESCE(r.gasto_rem, 0) AS gasto_rem,
+           COALESCE(i.ingreso_total, 0) AS ingreso_total
+    FROM rem r
+    FULL JOIN ing i ON r.rbd = i.rbd AND r.periodo = i.periodo
+    WHERE COALESCE(r.gasto_rem, 0) > 0 OR COALESCE(i.ingreso_total, 0) > 0
+),
+con_ratio AS (
+    SELECT rbd,
+           periodo,
+           gasto_rem,
+           ingreso_total,
+           CASE
+               WHEN ingreso_total > 0 THEN ROUND((gasto_rem / ingreso_total) * 100, 2)
+               ELSE NULL
+           END AS ratio_pct
+    FROM joined
+)
+SELECT rbd,
+       periodo,
+       gasto_rem,
+       ingreso_total,
+       ratio_pct,
+       CASE
+           WHEN ratio_pct IS NULL THEN 'Sin Datos'
+           WHEN ratio_pct < 70 THEN 'Riesgo Bajo'
+           WHEN ratio_pct < 85 THEN 'Riesgo Medio'
+           WHEN ratio_pct < 95 THEN 'Riesgo Alto'
+           ELSE 'Riesgo Crítico'
+       END AS nivel_riesgo,
+       CASE
+           WHEN ratio_pct IS NULL THEN 0
+           WHEN ratio_pct < 70 THEN 1
+           WHEN ratio_pct < 85 THEN 2
+           WHEN ratio_pct < 95 THEN 3
+           ELSE 4
+       END AS orden_riesgo
+FROM con_ratio
+WHERE (periodo = :p OR :p IS NULL)
+ORDER BY orden_riesgo DESC, ratio_pct DESC NULLS LAST`
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
         ℹ️ <strong>Metodología:</strong> Ratio = Gasto Remuneracional / Ingreso Depurado × 100 por Establecimiento (RBD).
         <span className="kpi-badge" style={{ marginLeft: 10, background: '#10b98120', color: '#10b981' }}>🟢 &lt;70% Bajo</span>

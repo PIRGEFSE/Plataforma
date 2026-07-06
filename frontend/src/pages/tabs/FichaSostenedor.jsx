@@ -7,6 +7,139 @@ import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import GastoRemIngresoEstablecimiento from './GastoRemIngresoEstablecimiento'
 import AnalisisRendicion from './AnalisisRendicion'
 import SNEDSostenedor from './SNEDSostenedor'
+import SqlViewer from '../../components/SqlViewer'
+
+// ── Catálogo de Widgets fijables al Resumen ────────────────────────────────────
+export const SOSTENEDOR_WIDGETS = [
+  // Educativo - Financiero
+  { key: 'ef_ingreso_gasto', label: 'Ingreso vs Gasto por EE', section: 'educativo_financiero', icon: '💵', color: '#10b981', grupo: 'Educativo - Financiero' },
+  { key: 'ef_superavit', label: 'Superávit / Déficit por EE', section: 'educativo_financiero', icon: '⚖️', color: '#6366f1', grupo: 'Educativo - Financiero' },
+  { key: 'ef_remuneraciones', label: 'Remuneraciones Top 15', section: 'educativo_financiero', icon: '💰', color: '#f59e0b', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned', label: 'Análisis SNED', section: 'educativo_financiero', icon: '🏆', color: '#8b5cf6', grupo: 'Educativo - Financiero' },
+  // Eficiencia del Gasto
+  { key: 'eg_distribucion_gasto', label: 'Distribución del Gasto (%)', section: 'eficiencia', icon: '📊', color: '#3b82f6', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_nivel_admin', label: 'Nivel Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#ef4444', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_kpis', label: 'KPIs Costo por Alumno', section: 'eficiencia', icon: '🎓', color: '#10b981', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_tabla', label: 'Tabla Costo por Alumno', section: 'eficiencia', icon: '📋', color: '#06b6d4', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_graficos', label: 'Gráficos Costo por Alumno', section: 'eficiencia', icon: '📈', color: '#f59e0b', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_kpis', label: 'KPIs Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#8b5cf6', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_tabla', label: 'Tabla Gasto Adm. por RBD', section: 'eficiencia', icon: '📋', color: '#ec4899', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_graficos', label: 'Gráficos Gasto Administrativo', section: 'eficiencia', icon: '📊', color: '#f97316', grupo: 'Eficiencia del Gasto' },
+  // Sostenibilidad y Riesgo — Acreditación de Saldos
+  { key: 'sr_acreditacion_grafico', label: 'Acreditación — Gráfico % Rendido', section: 'sostenibilidad_riesgo', icon: '📊', color: '#6366f1', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_acreditacion_monto', label: 'Acreditación — Top Monto No Rendido', section: 'sostenibilidad_riesgo', icon: '💸', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
+  // Sostenibilidad y Riesgo — Sostenibilidad Rem./Ingreso
+  { key: 'sr_sostenibilidad_ratio', label: 'Ratio Remuneraciones / Ingresos', section: 'sostenibilidad_riesgo', icon: '🛡️', color: '#f59e0b', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_sostenibilidad_scatter', label: 'Funcionarios vs Ingresos (Scatter)', section: 'sostenibilidad_riesgo', icon: '🔵', color: '#22d3ee', grupo: 'Sostenibilidad y Riesgo' },
+  // Sostenibilidad y Riesgo — HHI
+  { key: 'sr_hhi_graficos', label: 'HHI — Distribución y Evolución', section: 'sostenibilidad_riesgo', icon: '💰', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_hhi_fuentes', label: 'HHI — Composición Fuentes de Ingreso', section: 'sostenibilidad_riesgo', icon: '📋', color: '#8b5cf6', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_hhi_detalle', label: 'HHI — Serie Temporal por Período', section: 'sostenibilidad_riesgo', icon: '📈', color: '#f97316', grupo: 'Sostenibilidad y Riesgo' },
+  // Comportamiento Financiero
+  { key: 'cf_gasto_rem', label: 'Gastos Rem. sobre Ingreso Dep.', section: 'comportamiento_financiero', icon: '📉', color: '#f59e0b', grupo: 'Comportamiento Financiero' },
+  { key: 'cf_analisis_rendicion', label: 'Análisis Rendición', section: 'comportamiento_financiero', icon: '📋', color: '#6366f1', grupo: 'Comportamiento Financiero' },
+  // Territorio — Complejidad Educativa
+  { key: 'te_complejidad_ive', label: 'Complejidad — Top IVE por EE', section: 'territorio', icon: '🧩', color: '#10b981', grupo: 'Territorio' },
+  { key: 'te_complejidad_matricula', label: 'Complejidad — Matrícula y Comunas', section: 'territorio', icon: '🏫', color: '#6366f1', grupo: 'Territorio' },
+  { key: 'te_complejidad_prioridades', label: 'Complejidad — Distribución Prioridades', section: 'territorio', icon: '📊', color: '#f59e0b', grupo: 'Territorio' },
+  // Territorio — Gasto Educativo
+  { key: 'te_gasto_kpis', label: 'Gasto Educativo — KPIs', section: 'territorio', icon: '💰', color: '#22d3ee', grupo: 'Territorio' },
+  { key: 'te_gasto_tabla', label: 'Gasto Educativo — Tabla por Centro', section: 'territorio', icon: '📋', color: '#ec4899', grupo: 'Territorio' },
+  { key: 'te_gasto_graficos', label: 'Gasto Educativo — Gráficos', section: 'territorio', icon: '📈', color: '#84cc16', grupo: 'Territorio' },
+]
+
+const WIDGET_MAP = Object.fromEntries(SOSTENEDOR_WIDGETS.map(w => [w.key, w]))
+
+// ── Hook: usePinnedWidgets ─────────────────────────────────────────────────────
+// Persiste los pins en el servidor (GET/PUT /dashboard/resumen-pins).
+// Fallback a localStorage mientras se carga la primera vez.
+const LS_KEY = 'pirgefse-resumen-pins-cache'
+
+export function usePinnedWidgets() {
+  const [pins, setPins] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+  })
+  const [loading, setLoading] = useState(true)
+  const saving = useRef(false)
+
+  // Cargar desde servidor al montar
+  useEffect(() => {
+    api.get('/dashboard/resumen-pins')
+      .then(r => {
+        const serverPins = r.data.pins || []
+        setPins(serverPins)
+        localStorage.setItem(LS_KEY, JSON.stringify(serverPins))
+      })
+      .catch(() => { /* usa caché localStorage */ })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const togglePin = useCallback(async (key) => {
+    setPins(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+      localStorage.setItem(LS_KEY, JSON.stringify(next))
+      // Guardar en servidor de forma asíncrona
+      if (!saving.current) {
+        saving.current = true
+        api.put('/dashboard/resumen-pins', { pins: next }).finally(() => { saving.current = false })
+      }
+      return next
+    })
+  }, [])
+
+  const isPinned = useCallback((key) => pins.includes(key), [pins])
+
+  return { pins, isPinned, togglePin, loading }
+}
+
+// ── Contexto de Pins (compartido en árbol) ────────────────────────────────────
+export const PinsCtx = createContext({ pins: [], isPinned: () => false, togglePin: () => { } })
+export const usePins = () => useContext(PinsCtx)
+
+// ── Componente WidgetWrapper ─────────────────────────────────────────────────
+// Envuelve cualquier bloque de contenido (gráfico, tabla, KPIs) con un header
+// que incluye el título del widget y el botón de pin.
+export function WidgetWrapper({ widgetKey, children, compact = false }) {
+  const { isPinned, togglePin } = usePins()
+  const pinned = isPinned(widgetKey)
+  const widget = WIDGET_MAP[widgetKey]
+
+  return (
+    <div style={{ position: 'relative', marginBottom: compact ? '0' : '1.25rem' }}>
+      {/* Pin button flotante */}
+      <button
+        onClick={() => togglePin(widgetKey)}
+        title={pinned ? 'Quitar del Resumen' : 'Agregar al Resumen'}
+        style={{
+          position: 'absolute',
+          top: '0.6rem',
+          right: '0.75rem',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.3rem',
+          padding: '0.25rem 0.65rem',
+          borderRadius: '999px',
+          border: pinned
+            ? `1.5px solid ${widget?.color ?? '#6366f1'}`
+            : '1.5px solid var(--line-subtle)',
+          background: pinned ? `${widget?.color ?? '#6366f1'}18` : 'var(--surface-overlay)',
+          color: pinned ? (widget?.color ?? '#6366f1') : 'var(--text-muted)',
+          fontSize: '0.72rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+          transition: 'all 0.18s',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ fontSize: '0.85rem' }}>{pinned ? '📌' : '📌'}</span>
+        {pinned ? 'En Resumen' : 'Agregar al Resumen'}
+      </button>
+      {children}
+    </div>
+  )
+}
+
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const RIESGO_COLORS = {
@@ -148,6 +281,7 @@ const SECTION_TITLES = {
   sostenibilidad_riesgo: { icon: '🛡️', label: 'Sostenibilidad y Riesgo — por Establecimiento' },
   comportamiento_financiero: { icon: '📈', label: 'Comportamiento Financiero — por Establecimiento' },
   territorio: { icon: '🗺️', label: 'Territorio — IVE por Establecimiento' },
+  resumen: { icon: '🗂️', label: 'Resumen Personalizado' },
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -157,6 +291,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   const [perfil, setPerfil] = useState(null)
   const [establecimientos, setEstablecimientos] = useState([])
   const [loadingPerfil, setLoadingPerfil] = useState(true)
+  const pinsCtx = usePinnedWidgets()
 
   const [rdbData, setRdbData] = useState(null)
   const [loadingRbd, setLoadingRbd] = useState(false)
@@ -236,9 +371,9 @@ export default function FichaSostenedor({ section = 'perfil' }) {
     fetchRbd(periodo)
   }, [periodo, fetchRbd])
 
-  // Carga datos de Territorio (IVE)
+  // Carga datos de Territorio (IVE) y también para Resumen (puede tener widgets de territorio)
   useEffect(() => {
-    if (section !== 'territorio') return
+    if (section !== 'territorio' && section !== 'resumen') return
     setLoadingTerritorio(true)
     api.get(`/dashboard/ficha-sostenedor/territorio?sost_id=${sostId}&periodo=${periodo}`)
       .then(r => {
@@ -265,65 +400,78 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   )
 
   return (
-    <MoneyFmtCtx.Provider value={{ fmtAmt, fmtAxisAmt, unitLabel }}>
-    <div className="tab-page">
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="tab-header" style={{ position: 'sticky', top: 0, margin: '-30px -30px 20px -30px', padding: '20px 30px 15px', zIndex: 20, backgroundColor: 'var(--surface-raised)', borderBottom: '1px solid var(--line-subtle)', boxShadow: 'var(--shadow-sm)' }}>
-        <div>
-          <h2 className="tab-title">{sec.icon} {perfil.nombre_sost}</h2>
-          <p className="tab-subtitle">
-            {sec.label} · RUT {perfil.rut_sost} · {perfil.nom_com_sost}, Región {perfil.cod_reg_sost}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
-          <UnitSelector value={unitMode} onChange={setUnitMode} />
-          <span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--line-strong)', fontSize: '0.78rem', fontWeight: 600 }}>
-            🏛️ Municipal DAEM
-          </span>
-          <span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: '#05966922', color: '#34d399', border: '1px solid #059669', fontSize: '0.78rem', fontWeight: 600 }}>
+    <PinsCtx.Provider value={pinsCtx}>
+      <MoneyFmtCtx.Provider value={{ fmtAmt, fmtAxisAmt, unitLabel }}>
+        <div className="tab-page">
+          {/* ── Header ────────────────────────────────────────────────────────── */}
+          <div className="tab-header" style={{ position: 'sticky', top: 0, margin: '-30px -30px 20px -30px', padding: '20px 30px 15px', zIndex: 20, backgroundColor: 'var(--surface-raised)', borderBottom: '1px solid var(--line-subtle)', boxShadow: 'var(--shadow-sm)' }}>
+            <div>
+              <h2 className="tab-title">{sec.icon} {perfil.nombre_sost}</h2>
+              <p className="tab-subtitle">
+                {sec.label} · RUT {perfil.rut_sost} · {perfil.nom_com_sost}, Región {perfil.cod_reg_sost}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+              <UnitSelector value={unitMode} onChange={setUnitMode} />
+              <span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--line-strong)', fontSize: '0.78rem', fontWeight: 600 }}>
+                🏛️ Municipal DAEM
+              </span>
+              {/*span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: '#05966922', color: '#34d399', border: '1px solid #059669', fontSize: '0.78rem', fontWeight: 600 }}>
             ✅ Riesgo Bajo
-          </span>
+          </span>*/}
+            </div>
+          </div>
+
+          {/* ── KPIs solo en Mi Ficha ─────────────────────────────────────────── */}
+          {section === 'perfil' && (
+            <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+              <KPICard icon="🏫" label="Establec. Activos" value={fmtN(perfil.num_rbd)} color="#6366f1" sub={`${fmtN(perfil.num_rbd_tot)} totales`} />
+              <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#10b981" />
+              <KPICard icon="📚" label="Cargos Docentes" value={fmtN(perfil.num_c_doc)} color="#f59e0b" />
+              <KPICard icon="🤝" label="Cargos Asistentes" value={fmtN(perfil.num_c_asis)} color="#8b5cf6" />
+            </div>
+          )}
+
+          {/* ── Contenido por sección ─────────────────────────────────────────── */}
+          {section === 'perfil' && (
+            <TabPerfil perfil={perfil} establecimientos={establecimientos}
+              financiero_rbd={rdbData?.financiero_rbd ?? []} loadingRbd={loadingRbd} />
+          )}
+
+          {section !== 'perfil' && section !== 'territorio' && section !== 'resumen' && (
+            loadingRbd
+              ? <div className="loading-area"><div className="spinner" /></div>
+              : <>
+                {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
+                {section === 'educativo_financiero' && <TabEducativoFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+                {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+                {section === 'sostenibilidad_riesgo' && <TabSostenibilidadRiesgo rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+                {section === 'comportamiento_financiero' && <TabComportamientoFinanciero periodo={periodo} sostId={sostId} />}
+              </>
+          )}
+
+          {section === 'territorio' && (
+            loadingTerritorio
+              ? <div className="loading-area"><div className="spinner" /></div>
+              : <TabTerritorio data={territorioData} periodo={periodo} sostId={sostId} />
+          )}
+
+          {section === 'resumen' && (
+            <TabResumenSostenedor
+              rdbData={rdbData}
+              territorioData={territorioData}
+              periodo={periodo}
+              sostId={sostId}
+              loadingRbd={loadingRbd}
+            />
+          )}
         </div>
-      </div>
-
-      {/* ── KPIs solo en Mi Ficha ─────────────────────────────────────────── */}
-      {section === 'perfil' && (
-        <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-          <KPICard icon="🏫" label="Establec. Activos" value={fmtN(perfil.num_rbd)} color="#6366f1" sub={`${fmtN(perfil.num_rbd_tot)} totales`} />
-          <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#10b981" />
-          <KPICard icon="📚" label="Cargos Docentes" value={fmtN(perfil.num_c_doc)} color="#f59e0b" />
-          <KPICard icon="🤝" label="Cargos Asistentes" value={fmtN(perfil.num_c_asis)} color="#8b5cf6" />
-        </div>
-      )}
-
-      {/* ── Contenido por sección ─────────────────────────────────────────── */}
-      {section === 'perfil' && (
-        <TabPerfil perfil={perfil} establecimientos={establecimientos}
-          financiero_rbd={rdbData?.financiero_rbd ?? []} loadingRbd={loadingRbd} />
-      )}
-
-      {section !== 'perfil' && section !== 'territorio' && (
-        loadingRbd
-          ? <div className="loading-area"><div className="spinner" /></div>
-          : <>
-            {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
-            {section === 'educativo_financiero' && <TabEducativoFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} />}
-            {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} />}
-            {section === 'sostenibilidad_riesgo' && <TabSostenibilidadRiesgo rdbData={rdbData} periodo={periodo} sostId={sostId} />}
-            {section === 'comportamiento_financiero' && <TabComportamientoFinanciero periodo={periodo} sostId={sostId} />}
-          </>
-      )}
-
-      {section === 'territorio' && (
-        loadingTerritorio
-          ? <div className="loading-area"><div className="spinner" /></div>
-          : <TabTerritorio data={territorioData} periodo={periodo} sostId={sostId} />
-      )}
-    </div>
-    </MoneyFmtCtx.Provider>
+      </MoneyFmtCtx.Provider>
+    </PinsCtx.Provider>
   )
 }
+
 
 // ── Tab: Perfil ───────────────────────────────────────────────────────────────
 function TabPerfil({ perfil, establecimientos, financiero_rbd = [], loadingRbd }) {
@@ -526,7 +674,7 @@ function TabEducativoFinanciero({ rdbData, periodo, sostId }) {
 
   const SUB_TABS = [
     { key: 'ingreso_gasto', label: 'Ingreso - Gasto', icon: '💵', color: '#10b981' },
-    { key: 'sned',         label: 'SNED',            icon: '🏆', color: '#6366f1' },
+    { key: 'sned', label: 'SNED', icon: '🏆', color: '#6366f1' },
   ]
 
   return (
@@ -565,7 +713,7 @@ function TabEducativoFinanciero({ rdbData, periodo, sostId }) {
       </div>
 
       {subTab === 'ingreso_gasto' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
-      {subTab === 'sned'         && <SNEDSostenedor sostId={sostId} periodo={periodo} />}
+      {subTab === 'sned' && <SNEDSostenedor sostId={sostId} periodo={periodo} />}
     </div>
   )
 }
@@ -608,7 +756,7 @@ function TabFinanciero({ rdbData, periodo }) {
     yAxis: { type: 'category', data: names, axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
     series: [
       { name: 'Ingreso', type: 'bar', data: visible.map(d => Number(d.ingreso)), barMaxWidth: 16, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } },
-      { name: 'Gasto',   type: 'bar', data: visible.map(d => Number(d.gasto)),   barMaxWidth: 16, itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } },
+      { name: 'Gasto', type: 'bar', data: visible.map(d => Number(d.gasto)), barMaxWidth: 16, itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } },
     ],
     backgroundColor: 'transparent',
   }
@@ -662,8 +810,33 @@ function TabFinanciero({ rdbData, periodo }) {
     border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', fontSize: '0.8rem', minWidth: 220,
   }
 
+  const sqlStr = `SELECT
+    er.rbd,
+    eo.nom_rbd,
+    SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+             AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+             AND er.cuenta_alias_padre LIKE '3%'
+             THEN er.monto_declarado ELSE 0 END) AS ingreso,
+    SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+             AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+             THEN er.monto_declarado ELSE 0 END) AS gasto,
+    SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+             AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+             AND er.cuenta_alias_padre LIKE '3%'
+             THEN er.monto_declarado
+             WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+             AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+             THEN -er.monto_declarado ELSE 0 END) AS superavit
+FROM estado_resultado er
+JOIN dim_establecimiento_oficial eo ON eo.rbd = er.rbd AND eo.agno = er.periodo
+WHERE er.sost_id = :sid
+  AND er.periodo = :per
+GROUP BY er.rbd, eo.nom_rbd
+ORDER BY ingreso DESC`
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📈" label={`Total Ingresos (${periodo})`} value={fmtAmt(totalIng)} color="#10b981" />
         <KPICard icon="📉" label={`Total Gastos (${periodo})`} value={fmtAmt(totalGas)} color="#ef4444" />
@@ -725,30 +898,37 @@ function TabFinanciero({ rdbData, periodo }) {
         </div>
       </div>
 
-      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Ingreso vs Gasto por Establecimiento — {periodo} ({unitLabel})</h3>
-        {visible.length === 0
-          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
-          : <ReactECharts option={barOption} style={{ height: h }} />
-        }
-      </div>
-      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Superávit / Déficit por Establecimiento — {periodo} ({unitLabel})</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: '#10b981' }}>■</span> Superávit &nbsp;<span style={{ color: '#ef4444' }}>■</span> Déficit
-        </p>
-        {visible.length === 0
-          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
-          : <ReactECharts option={superavitOption} style={{ height: h }} />
-        }
-      </div>
-      <div className="chart-card">
-        <h3 className="chart-title">Top 15 — Remuneraciones Líquidas por Establecimiento — {periodo} ({unitLabel})</h3>
-        <ReactECharts option={remOption} style={{ height: 440 }} />
-      </div>
+      <WidgetWrapper widgetKey="ef_ingreso_gasto">
+        <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="chart-title">Ingreso vs Gasto por Establecimiento — {periodo} ({unitLabel})</h3>
+          {visible.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
+            : <ReactECharts option={barOption} style={{ height: h }} />
+          }
+        </div>
+      </WidgetWrapper>
+      <WidgetWrapper widgetKey="ef_superavit">
+        <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="chart-title">Superávit / Déficit por Establecimiento — {periodo} ({unitLabel})</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#10b981' }}>■</span> Superávit &nbsp;<span style={{ color: '#ef4444' }}>■</span> Déficit
+          </p>
+          {visible.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
+            : <ReactECharts option={superavitOption} style={{ height: h }} />
+          }
+        </div>
+      </WidgetWrapper>
+      <WidgetWrapper widgetKey="ef_remuneraciones">
+        <div className="chart-card">
+          <h3 className="chart-title">Top 15 — Remuneraciones Líquidas por Establecimiento — {periodo} ({unitLabel})</h3>
+          <ReactECharts option={remOption} style={{ height: 440 }} />
+        </div>
+      </WidgetWrapper>
     </>
   )
 }
+
 
 // ── Tab: Eficiencia (Sub-tabs) ──────────────────────────────────────────────────
 function TabEficiencia({ rdbData, periodo, sostId }) {
@@ -874,46 +1054,91 @@ function RenderInnovacionPedagogica({ rdbData, periodo }) {
   const prom = sorted.length > 0 ? sorted.reduce((s, d) => s + d.pct_admin, 0) / sorted.length : 0
   const optim = sorted.filter(d => d.nivel_eficiencia === 'Optimo').length
   const elev = sorted.filter(d => d.nivel_eficiencia === 'Elevado').length
-  const pgBtn = (dis) => ({ padding:'0.3rem 0.75rem', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', background: dis?'var(--surface-base)':'var(--surface-overlay)', color: dis?'var(--text-muted)':'var(--text-primary)', cursor: dis?'not-allowed':'pointer', fontSize:'0.8rem' })
-  const inpSt = { padding:'0.35rem 0.75rem', backgroundColor:'var(--surface-base)', color: 'var(--text-primary)', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', fontSize:'0.8rem', minWidth:220 }
+  const pgBtn = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', background: dis ? 'var(--surface-base)' : 'var(--surface-overlay)', color: dis ? 'var(--text-muted)' : 'var(--text-primary)', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const inpSt = { padding: '0.35rem 0.75rem', backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', fontSize: '0.8rem', minWidth: 220 }
+
+  const sqlStr = `SELECT
+    er.rbd,
+    eo.nom_rbd,
+    SUM(er.monto_declarado) FILTER (
+        WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+          AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+    ) AS total_gasto,
+    ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND er.cuenta_alias LIKE '410%'
+        ) / NULLIF(SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+        ), 0), 1) AS pct_aula,
+    ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND er.cuenta_alias LIKE '411%'
+        ) / NULLIF(SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+        ), 0), 1) AS pct_admin,
+    ROUND(100.0 * SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND er.cuenta_alias LIKE '700%'
+        ) / NULLIF(SUM(er.monto_declarado) FILTER (
+            WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+              AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+        ), 0), 1) AS pct_otros
+FROM estado_resultado er
+JOIN dim_establecimiento_oficial eo ON eo.rbd = er.rbd AND eo.agno = er.periodo
+WHERE er.sost_id = :sid
+  AND er.periodo = :per
+GROUP BY er.rbd, eo.nom_rbd
+HAVING SUM(er.monto_declarado) FILTER (
+    WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+      AND UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+) > 0
+ORDER BY total_gasto DESC`
 
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📊" label="Prom. Gasto Admin" value={`${prom.toFixed(1)}%`} color={prom <= 15 ? '#10b981' : prom <= 25 ? '#f59e0b' : '#ef4444'} />
         <KPICard icon="🟢" label="EE Óptimos (≤15%)" value={fmtN(optim)} color="#10b981" />
         <KPICard icon="🔴" label="EE Elevados (>25%)" value={fmtN(elev)} color="#ef4444" />
         <KPICard icon="⚙️" label="EE Moderados" value={fmtN(sorted.length - optim - elev)} color="#f59e0b" />
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem', flexWrap:'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={inpSt} />
         {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
-        <span style={{ fontSize:'0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{filtered.length===0?0:safePage*10+1}–{Math.min((safePage+1)*10,filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b> establecimientos</span>
-        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
-          <button disabled={safePage===0} onClick={() => setPage(p=>p-1)} style={pgBtn(safePage===0)}>← Anterior</button>
-          <span style={{ color: 'var(--text-muted)', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{safePage+1} / {totalPages}</span>
-          <button disabled={safePage>=totalPages-1} onClick={() => setPage(p=>p+1)} style={pgBtn(safePage>=totalPages-1)}>Siguiente →</button>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{filtered.length === 0 ? 0 : safePage * 10 + 1}–{Math.min((safePage + 1) * 10, filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b> establecimientos</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage === 0} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage === 0)}>← Anterior</button>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage + 1} / {totalPages}</span>
+          <button disabled={safePage >= totalPages - 1} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages - 1)}>Siguiente →</button>
         </div>
       </div>
-      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Distribución del Gasto por Categoría (%) — {periodo}</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: '#10b981' }}>■</span> Aula &nbsp;<span style={{ color: '#ef4444' }}>■</span> Administrativo &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Otros
-        </p>
-        <ReactECharts option={pct100Option} style={{ height: h }} />
-      </div>
-      <div className="chart-card">
-        <h3 className="chart-title">Nivel de Gasto Administrativo por Establecimiento (%) — {periodo}</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: '#10b981' }}>■</span> Óptimo ≤15% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado ≤25% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Elevado &gt;25%
-        </p>
-        <ReactECharts option={adminOption} style={{ height: h }} />
-      </div>
+      <WidgetWrapper widgetKey="eg_distribucion_gasto">
+        <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="chart-title">Distribución del Gasto por Categoría (%) — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#10b981' }}>■</span> Aula &nbsp;<span style={{ color: '#ef4444' }}>■</span> Administrativo &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Otros
+          </p>
+          <ReactECharts option={pct100Option} style={{ height: h }} />
+        </div>
+      </WidgetWrapper>
+      <WidgetWrapper widgetKey="eg_nivel_admin">
+        <div className="chart-card">
+          <h3 className="chart-title">Nivel de Gasto Administrativo por Establecimiento (%) — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#10b981' }}>■</span> Óptimo ≤15% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado ≤25% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Elevado &gt;25%
+          </p>
+          <ReactECharts option={adminOption} style={{ height: h }} />
+        </div>
+      </WidgetWrapper>
     </>
   )
 }
 
-function RenderCostoAlumno({ sostId, periodo }) {
+
+function RenderCostoAlumno({ sostId, periodo, widgetFilter = null }) {
   const C = useChartColors()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -943,7 +1168,7 @@ function RenderCostoAlumno({ sostId, periodo }) {
   const { costo_establecimientos = [], resumen = {} } = data
 
   const filterText = search.toLowerCase().trim()
-  const filtered = costo_establecimientos.filter(ee => 
+  const filtered = costo_establecimientos.filter(ee =>
     (ee.nombre_rbd ?? '').toLowerCase().includes(filterText) ||
     String(ee.rbd ?? '').includes(filterText)
   )
@@ -983,30 +1208,132 @@ function RenderCostoAlumno({ sostId, periodo }) {
   const pieOption = {
     tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Monto: ${fmtAmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
     legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: C.axisLabel, fontSize: 11 } },
-    series: [{ 
-      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], 
+    series: [{
+      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'],
       data: [
         { name: 'Docencia y Apoyo', value: resumen.total_docencia, itemStyle: { color: '#8b5cf6' } },
         { name: 'Operacional', value: resumen.total_operacional, itemStyle: { color: '#10b981' } }
       ],
-      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' } } 
+      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' } }
     }],
     backgroundColor: 'transparent',
   }
 
-  return (
-    <>
+  const sqlStr = `WITH gastos AS (
+    SELECT 
+        d.rbd,
+        d.nombre_rbd,
+        SUM(d.monto_declarado) as total_gasto,
+        SUM(CASE WHEN d.desc_cuenta_padre IN (
+            'GASTOS EN EQUIPAMIENTO DE APOYO PEDAGÓGICO', 
+            'GASTOS EN RECURSOS DE APRENDIZAJE', 
+            'OTROS GASTOS EN PERSONAL', 
+            'GASTOS EN ALUMNOS', 
+            'GASTOS BIENESTAR ALUMNOS',
+            'ASESORÍA TÉCNICA Y ACTIVIDADES DE INFORMACIÓN Y ORIENTACIÓN'
+        ) THEN d.monto_declarado ELSE 0 END) as gasto_docencia,
+        SUM(CASE WHEN d.desc_cuenta_padre NOT IN (
+            'GASTOS EN EQUIPAMIENTO DE APOYO PEDAGÓGICO', 
+            'GASTOS EN RECURSOS DE APRENDIZAJE', 
+            'OTROS GASTOS EN PERSONAL', 
+            'GASTOS EN ALUMNOS', 
+            'GASTOS BIENESTAR ALUMNOS',
+            'ASESORÍA TÉCNICA Y ACTIVIDADES DE INFORMACIÓN Y ORIENTACIÓN'
+        ) THEN d.monto_declarado ELSE 0 END) as gasto_operacional
+    FROM documentos d
+    WHERE d.sost_id = :sid AND d.periodo = :agno AND d.rbd IS NOT NULL
+    GROUP BY d.rbd, d.nombre_rbd
+)
+SELECT 
+    g.rbd,
+    g.nombre_rbd,
+    g.total_gasto,
+    g.gasto_docencia,
+    g.gasto_operacional,
+    eo.mat_total,
+    CASE WHEN eo.mat_total > 0 THEN g.total_gasto / eo.mat_total ELSE 0 END as costo_por_alumno
+FROM gastos g
+LEFT JOIN dim_establecimiento_oficial eo ON g.rbd = eo.rbd AND eo.agno = :agno
+ORDER BY costo_por_alumno DESC NULLS LAST`
+
+  // ── Early return para el tab Resumen ─────────────────────────────────────
+  if (widgetFilter === 'eg_costo_alumno_kpis') {
+    return (
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="🎓" label="Costo Prom. Alumno" value={fmtAmt(resumen.costo_promedio_general)} color="#3b82f6" sub="Nivel Sostenedor" />
         <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(resumen.total_matricula_evaluada)} color="#10b981" sub="Establecimientos evaluados" />
         <KPICard icon="📚" label="Gasto Docencia" value={fmtAmt(resumen.total_docencia)} color="#8b5cf6" />
         <KPICard icon="⚙️" label="Gasto Operacional" value={fmtAmt(resumen.total_operacional)} color="#f59e0b" />
       </div>
+    )
+  }
+  if (widgetFilter === 'eg_costo_alumno_tabla') {
+    return (
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Detalle Costo por Alumno — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-overlay)' }}>
+                {[{ h: 'RBD', a: 'left' }, { h: 'Establecimiento', a: 'left' }, { h: 'Matrícula', a: 'right' }, { h: 'Gasto Docencia', a: 'right' }, { h: 'Gasto Operacional', a: 'right' }, { h: 'Costo por Alumno', a: 'right' }].map(({ h, a }) => (
+                  <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                  <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span title={ee.nombre_rbd}>{ee.nombre_rbd}</span></td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel }}>{fmtN(ee.mat_total)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#8b5cf6' }}>{fmtAmt(ee.gasto_docencia)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981' }}>{fmtAmt(ee.gasto_operacional)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#3b82f6', fontWeight: 700 }}>{fmtAmt(ee.costo_por_alumno)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'eg_costo_alumno_graficos') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Mayor Costo por Alumno (filtrado)</h3>
+          {chartData.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Distribución General de Costos</h3>
+          <ReactECharts option={pieOption} style={{ height: 300 }} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <SqlViewer sql={sqlStr} />
+      <WidgetWrapper widgetKey="eg_costo_alumno_kpis">
+        <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+          <KPICard icon="🎓" label="Costo Prom. Alumno" value={fmtAmt(resumen.costo_promedio_general)} color="#3b82f6" sub="Nivel Sostenedor" />
+          <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(resumen.total_matricula_evaluada)} color="#10b981" sub="Establecimientos evaluados" />
+          <KPICard icon="📚" label="Gasto Docencia" value={fmtAmt(resumen.total_docencia)} color="#8b5cf6" />
+          <KPICard icon="⚙️" label="Gasto Operacional" value={fmtAmt(resumen.total_operacional)} color="#f59e0b" />
+        </div>
+      </WidgetWrapper>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por nombre de establecimiento o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
         {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
-        
+
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           Mostrando <b style={{ color: C.axisLabel }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b>
         </span>
@@ -1017,66 +1344,70 @@ function RenderCostoAlumno({ sostId, periodo }) {
         </div>
       </div>
 
-      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
-        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>Detalle Costo por Alumno — {periodo} ({fmtN(filtered.length)} resultados)</h3>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{h:'RBD',a:'left'},{h:'Establecimiento',a:'left'},{h:'Matrícula',a:'right'},{h:'Gasto Docencia',a:'right'},{h:'Gasto Operacional',a:'right'},{h:'Costo por Alumno',a:'right'}].map(({h,a})=>(
-                  <th key={h} style={{padding:'0.55rem 0.8rem',color: 'var(--text-muted)',fontWeight:600,textAlign:a,borderBottom: '1px solid var(--line-subtle)',whiteSpace:'nowrap'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 && <tr><td colSpan={6} style={{padding:'2rem',textAlign:'center',color: 'var(--text-muted)'}}>Sin resultados para «{search}»</td></tr>}
-              {paginated.map((ee, i) => (
-                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{borderBottom: '1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                  <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd}</td>
-                  <td style={{padding:'0.45rem 0.8rem',color: 'var(--text-primary)',maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
-                  </td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color: C.axisLabel,fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.mat_total)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#8b5cf6',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docencia)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_operacional)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#3b82f6',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.costo_por_alumno)}</td>
+      <WidgetWrapper widgetKey="eg_costo_alumno_tabla">
+        <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+          <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+            <h3 className="chart-title" style={{ margin: 0 }}>Detalle Costo por Alumno — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-overlay)' }}>
+                  {[{ h: 'RBD', a: 'left' }, { h: 'Establecimiento', a: 'left' }, { h: 'Matrícula', a: 'right' }, { h: 'Gasto Docencia', a: 'right' }, { h: 'Gasto Operacional', a: 'right' }, { h: 'Costo por Alumno', a: 'right' }].map(({ h, a }) => (
+                    <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{padding:'0.75rem 1.25rem',borderTop: '1px solid var(--line-subtle)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
-          <span style={{color: 'var(--text-muted)',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
-          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
-            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
-            <span style={{color: 'var(--text-muted)',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
-            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+              </thead>
+              <tbody>
+                {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+                {paginated.map((ee, i) => (
+                  <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
+                    </td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.mat_total)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#8b5cf6', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_docencia)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_operacional)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#3b82f6', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.costo_por_alumno)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length}</span>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 60, textAlign: 'center' }}>Pág. {safePage} / {totalPages}</span>
+              <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+            </div>
           </div>
         </div>
-      </div>
+      </WidgetWrapper>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
-        <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Mayor Costo por Alumno (filtrado)</h3>
-          {chartData.length===0
-            ? <p style={{color: 'var(--text-muted)',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
-            : <ReactECharts option={barOption} style={{height:Math.max(280,chartData.length*38)}} />
-          }
+      <WidgetWrapper widgetKey="eg_costo_alumno_graficos">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div className="chart-card">
+            <h3 className="chart-title">Top 10 — Mayor Costo por Alumno (filtrado)</h3>
+            {chartData.length === 0
+              ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+              : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+            }
+          </div>
+          <div className="chart-card">
+            <h3 className="chart-title">Distribución General de Costos</h3>
+            <ReactECharts option={pieOption} style={{ height: 300 }} />
+          </div>
         </div>
-        <div className="chart-card">
-          <h3 className="chart-title">Distribución General de Costos</h3>
-          <ReactECharts option={pieOption} style={{height:300}} />
-        </div>
-      </div>
+      </WidgetWrapper>
     </>
   )
 }
 
 
 
-function RenderGastoAdministrativo({ sostId, periodo }) {
+function RenderGastoAdministrativo({ sostId, periodo, widgetFilter = null }) {
   const C = useChartColors()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1106,7 +1437,7 @@ function RenderGastoAdministrativo({ sostId, periodo }) {
   const { gasto_por_establecimiento = [], gasto_por_funcion = [], gasto_por_cuenta = [], resumen = {} } = data
 
   const filterText = search.toLowerCase().trim()
-  const filtered = gasto_por_establecimiento.filter(ee => 
+  const filtered = gasto_por_establecimiento.filter(ee =>
     (ee.nom_rbd ?? '').toLowerCase().includes(filterText) ||
     String(ee.rbd ?? '').includes(filterText)
   )
@@ -1144,27 +1475,133 @@ function RenderGastoAdministrativo({ sostId, periodo }) {
   const pieOption = {
     tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Gasto: ${fmtAmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
     legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: C.axisLabel, fontSize: 10 }, formatter: name => name.length > 35 ? name.slice(0, 33) + '...' : name },
-    series: [{ 
-      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], 
+    series: [{
+      type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'],
       data: gasto_por_cuenta.map((c, i) => ({ name: c.cuenta_alias, value: c.total, itemStyle: { color: COLORS[i % COLORS.length] } })),
-      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' } } 
+      label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' } }
     }],
     backgroundColor: 'transparent',
   }
 
-  return (
-    <>
+  const sqlStr = `-- Gasto por establecimiento y desglosado
+WITH base AS (
+    SELECT 
+        r.rbd,
+        eo.nom_rbd,
+        SUM(r.monto) as total_gasto,
+        SUM(CASE WHEN r.fun = 'DOCAUL' THEN r.monto ELSE 0 END) as gasto_docaul,
+        SUM(CASE WHEN r.fun = 'ASIPAR' THEN r.monto ELSE 0 END) as gasto_asipar,
+        SUM(CASE WHEN r.fun = 'DOCDIR' THEN r.monto ELSE 0 END) as gasto_docdir,
+        SUM(CASE WHEN r.fun NOT IN ('DOCAUL', 'ASIPAR', 'DOCDIR') THEN r.monto ELSE 0 END) as gasto_otros
+    FROM remuneraciones r
+    LEFT JOIN dim_establecimiento_oficial eo ON r.rbd = eo.rbd AND eo.agno = :agno
+    WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+    GROUP BY r.rbd, eo.nom_rbd
+)
+SELECT * FROM base ORDER BY total_gasto DESC NULLS LAST;
+
+-- Gasto total por Función
+SELECT 
+    COALESCE('(' || df.dependencia_funcion || ') ' || df.descripcion, r.fun, 'SIN FUN') as fun, 
+    SUM(r.monto) as total
+FROM remuneraciones r
+LEFT JOIN dim_funcion df ON r.fun = df.abrev
+WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+GROUP BY COALESCE('(' || df.dependencia_funcion || ') ' || df.descripcion, r.fun, 'SIN FUN')
+ORDER BY total DESC LIMIT 10;
+
+-- Gasto por Cuenta
+SELECT 
+    COALESCE(dc.desc_cuenta, r.cuenta_alias) as cuenta_alias, 
+    SUM(r.monto) as total
+FROM remuneraciones r
+LEFT JOIN dim_cuenta dc ON r.cuenta_alias = dc.cuenta_alias
+WHERE r.sostenedor = :sid AND r.anio = :agno AND r.cuenta_alias LIKE '4101%'
+GROUP BY COALESCE(dc.desc_cuenta, r.cuenta_alias)
+ORDER BY total DESC LIMIT 10;`
+
+  // ── Early return para el tab Resumen ─────────────────────────────────────
+  if (widgetFilter === 'eg_gasto_adm_kpis') {
+    return (
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="💼" label="Gasto Total Remuneracional" value={fmtAmt(resumen.total_gasto)} color="#8b5cf6" />
         <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.centros)} color="#3b82f6" sub="Establec. + Adm. Central" />
         <KPICard icon="👨‍🏫" label="Gasto Docentes de Aula" value={fmtAmt(resumen.total_docaul)} color="#10b981" sub="Función DOCAUL" />
         <KPICard icon="📊" label="Promedio por Centro" value={fmtAmt(resumen.centros ? resumen.total_gasto / resumen.centros : 0)} color="#f59e0b" />
       </div>
+    )
+  }
+  if (widgetFilter === 'eg_gasto_adm_tabla') {
+    return (
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Distribución Remuneracional por RBD — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-overlay)' }}>
+                {[{ h: 'RBD', a: 'left' }, { h: 'Establecimiento', a: 'left' }, { h: 'Doc. Aula', a: 'right' }, { h: 'Asist. Parvularia', a: 'right' }, { h: 'Doc. Directivo', a: 'right' }, { h: 'Otros Gastos', a: 'right' }, { h: 'Total Gasto', a: 'right' }].map(({ h, a }) => (
+                  <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nom_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                  <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span title={ee.nom_rbd}>{ee.nom_rbd}</span></td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981' }}>{fmtAmt(ee.gasto_docaul)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#3b82f6' }}>{fmtAmt(ee.gasto_asipar)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#f59e0b' }}>{fmtAmt(ee.gasto_docdir)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel }}>{fmtAmt(ee.gasto_otros)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#8b5cf6', fontWeight: 700 }}>{fmtAmt(ee.total_gasto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'eg_gasto_adm_graficos') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Gasto por Tipo de Función (FUN)</h3>
+          {gasto_por_funcion.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{ height: Math.max(280, gasto_por_funcion.length * 38) }} />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Gasto por Cuenta Alias</h3>
+          {gasto_por_cuenta.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+            : <ReactECharts option={pieOption} style={{ height: 300 }} />
+          }
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <SqlViewer sql={sqlStr} />
+      <WidgetWrapper widgetKey="eg_gasto_adm_kpis">
+        <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+          <KPICard icon="💼" label="Gasto Total Remuneracional" value={fmtAmt(resumen.total_gasto)} color="#8b5cf6" />
+          <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.centros)} color="#3b82f6" sub="Establec. + Adm. Central" />
+          <KPICard icon="👨‍🏫" label="Gasto Docentes de Aula" value={fmtAmt(resumen.total_docaul)} color="#10b981" sub="Función DOCAUL" />
+          <KPICard icon="📊" label="Promedio por Centro" value={fmtAmt(resumen.centros ? resumen.total_gasto / resumen.centros : 0)} color="#f59e0b" />
+        </div>
+      </WidgetWrapper>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por nombre de establecimiento o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
         {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
-        
+
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           Mostrando <b style={{ color: C.axisLabel }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b>
         </span>
@@ -1175,70 +1612,74 @@ function RenderGastoAdministrativo({ sostId, periodo }) {
         </div>
       </div>
 
-      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
-        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>Distribución Remuneracional por RBD — {periodo} ({fmtN(filtered.length)} resultados)</h3>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{h:'RBD',a:'left'},{h:'Establecimiento',a:'left'},{h:'Doc. Aula',a:'right'},{h:'Asist. Parvularia',a:'right'},{h:'Doc. Directivo',a:'right'},{h:'Otros Gastos',a:'right'},{h:'Total Gasto',a:'right'}].map(({h,a})=>(
-                  <th key={h} style={{padding:'0.55rem 0.8rem',color: 'var(--text-muted)',fontWeight:600,textAlign:a,borderBottom: '1px solid var(--line-subtle)',whiteSpace:'nowrap'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 && <tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color: 'var(--text-muted)'}}>Sin resultados para «{search}»</td></tr>}
-              {paginated.map((ee, i) => (
-                <tr key={`${ee.rbd}-${ee.nom_rbd}`} style={{borderBottom: '1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                  <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd || 'N/A'}</td>
-                  <td style={{padding:'0.45rem 0.8rem',color: 'var(--text-primary)',maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    <span title={ee.nom_rbd}>{ee.nom_rbd}</span>
-                  </td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docaul)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#3b82f6',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_asipar)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#f59e0b',fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_docdir)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color: C.axisLabel,fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.gasto_otros)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#8b5cf6',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmtAmt(ee.total_gasto)}</td>
+      <WidgetWrapper widgetKey="eg_gasto_adm_tabla">
+        <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+          <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+            <h3 className="chart-title" style={{ margin: 0 }}>Distribución Remuneracional por RBD — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-overlay)' }}>
+                  {[{ h: 'RBD', a: 'left' }, { h: 'Establecimiento', a: 'left' }, { h: 'Doc. Aula', a: 'right' }, { h: 'Asist. Parvularia', a: 'right' }, { h: 'Doc. Directivo', a: 'right' }, { h: 'Otros Gastos', a: 'right' }, { h: 'Total Gasto', a: 'right' }].map(({ h, a }) => (
+                    <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{padding:'0.75rem 1.25rem',borderTop: '1px solid var(--line-subtle)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
-          <span style={{color: 'var(--text-muted)',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
-          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
-            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
-            <span style={{color: 'var(--text-muted)',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
-            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+              </thead>
+              <tbody>
+                {paginated.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+                {paginated.map((ee, i) => (
+                  <tr key={`${ee.rbd}-${ee.nom_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span title={ee.nom_rbd}>{ee.nom_rbd}</span>
+                    </td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_docaul)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#3b82f6', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_asipar)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_docdir)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.gasto_otros)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#8b5cf6', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(ee.total_gasto)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length}</span>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 60, textAlign: 'center' }}>Pág. {safePage} / {totalPages}</span>
+              <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+            </div>
           </div>
         </div>
-      </div>
+      </WidgetWrapper>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
-        <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Gasto por Tipo de Función (FUN)</h3>
-          {gasto_por_funcion.length===0
-            ? <p style={{color: 'var(--text-muted)',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
-            : <ReactECharts option={barOption} style={{height:Math.max(280,gasto_por_funcion.length*38)}} />
-          }
+      <WidgetWrapper widgetKey="eg_gasto_adm_graficos">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div className="chart-card">
+            <h3 className="chart-title">Top 10 — Gasto por Tipo de Función (FUN)</h3>
+            {gasto_por_funcion.length === 0
+              ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+              : <ReactECharts option={barOption} style={{ height: Math.max(280, gasto_por_funcion.length * 38) }} />
+            }
+          </div>
+          <div className="chart-card">
+            <h3 className="chart-title">Top 10 — Gasto por Cuenta Alias</h3>
+            {gasto_por_cuenta.length === 0
+              ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+              : <ReactECharts option={pieOption} style={{ height: 300 }} />
+            }
+          </div>
         </div>
-        <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Gasto por Cuenta Alias</h3>
-          {gasto_por_cuenta.length===0
-            ? <p style={{color: 'var(--text-muted)',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
-            : <ReactECharts option={pieOption} style={{height:300}} />
-          }
-        </div>
-      </div>
+      </WidgetWrapper>
     </>
   )
 }
 
 
 // ── Tab: Sostenibilidad ────────────────────────────────────────────────────────
-function TabSostenibilidad({ rdbData, periodo }) {
+function TabSostenibilidad({ rdbData, periodo, widgetFilter = null }) {
   const C = useChartColors()
   if (!rdbData) return null
   const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
@@ -1310,44 +1751,86 @@ function TabSostenibilidad({ rdbData, periodo }) {
   const saludables = merged.filter(d => d.nivel_ratio === 'Saludable').length
   const promRatio = merged.filter(d => d.ratio != null).reduce((s, d) => s + d.ratio, 0) / (merged.filter(d => d.ratio != null).length || 1)
 
-  const pgBtnS = (dis) => ({ padding:'0.3rem 0.75rem', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', background: dis?'var(--surface-base)':'var(--surface-overlay)', color: dis?'var(--text-muted)':'var(--text-primary)', cursor: dis?'not-allowed':'pointer', fontSize:'0.8rem' })
-  const inpStS = { padding:'0.35rem 0.75rem', backgroundColor:'var(--surface-base)', color: 'var(--text-primary)', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', fontSize:'0.8rem', minWidth:220 }
+  const pgBtnS = (dis) => ({ padding: '0.3rem 0.75rem', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', background: dis ? 'var(--surface-base)' : 'var(--surface-overlay)', color: dis ? 'var(--text-muted)' : 'var(--text-primary)', cursor: dis ? 'not-allowed' : 'pointer', fontSize: '0.8rem' })
+  const inpStS = { padding: '0.35rem 0.75rem', backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', fontSize: '0.8rem', minWidth: 220 }
+
+  const sqlStr = `SELECT
+    r.rbd,
+    eo.nom_rbd,
+    COUNT(DISTINCT r.rut) AS funcionarios,
+    SUM(r.liquido) AS total_liquido,
+    ROUND(AVG(r.liquido), 0) AS promedio_liquido
+FROM remuneraciones r
+JOIN dim_establecimiento_oficial eo ON eo.rbd = r.rbd AND eo.agno = r.anio
+WHERE r.sostenedor = :sid
+  AND r.anio = :per
+GROUP BY r.rbd, eo.nom_rbd
+ORDER BY total_liquido DESC`
+
+  // ── Early return para el tab Resumen ─────────────────────────────────────
+  if (widgetFilter === 'sr_sostenibilidad_ratio') {
+    return (
+      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+        <h3 className="chart-title">Ratio Remuneraciones / Ingresos por Establecimiento (%) — {periodo}</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+          <span style={{ color: '#10b981' }}>■</span> Saludable &lt;50% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado 50–70% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Crítico &gt;70%
+        </p>
+        {visible.length === 0
+          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados.</p>
+          : <ReactECharts option={ratioOption} style={{ height: h }} />
+        }
+      </div>
+    )
+  }
+  if (widgetFilter === 'sr_sostenibilidad_scatter') {
+    return (
+      <div className="chart-card">
+        <h3 className="chart-title">Funcionarios vs Ingresos por Establecimiento — {periodo}</h3>
+        <ReactECharts option={scatterOption} style={{ height: 320 }} />
+      </div>
+    )
+  }
 
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📊" label="Ratio Prom. Rem/Ingreso" value={`${promRatio.toFixed(1)}%`} color={promRatio > 70 ? '#ef4444' : promRatio > 50 ? '#f59e0b' : '#10b981'} />
         <KPICard icon="✅" label="EE Saludables (<50%)" value={fmtN(saludables)} color="#10b981" />
         <KPICard icon="🟡" label="EE Moderados (50–70%)" value={fmtN(moderados)} color="#f59e0b" />
         <KPICard icon="🔴" label="EE Críticos (>70%)" value={fmtN(criticos)} color="#ef4444" />
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem', flexWrap:'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={inpStS} />
         {search && <button onClick={() => setSearch('')} style={pgBtnS(false)}>✕ Limpiar</button>}
-        <span style={{ fontSize:'0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{filtered.length===0?0:safePage*10+1}–{Math.min((safePage+1)*10,filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b> establecimientos</span>
-        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
-          <button disabled={safePage===0} onClick={() => setPage(p=>p-1)} style={pgBtnS(safePage===0)}>← Anterior</button>
-          <span style={{ color: 'var(--text-muted)', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{safePage+1} / {totalPages}</span>
-          <button disabled={safePage>=totalPages-1} onClick={() => setPage(p=>p+1)} style={pgBtnS(safePage>=totalPages-1)}>Siguiente →</button>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{filtered.length === 0 ? 0 : safePage * 10 + 1}–{Math.min((safePage + 1) * 10, filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b> establecimientos</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button disabled={safePage === 0} onClick={() => setPage(p => p - 1)} style={pgBtnS(safePage === 0)}>← Anterior</button>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{safePage + 1} / {totalPages}</span>
+          <button disabled={safePage >= totalPages - 1} onClick={() => setPage(p => p + 1)} style={pgBtnS(safePage >= totalPages - 1)}>Siguiente →</button>
         </div>
       </div>
-      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Ratio Remuneraciones / Ingresos por Establecimiento (%) — {periodo}</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: '#10b981' }}>■</span> Saludable &lt;50% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado 50–70% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Crítico &gt;70%
-        </p>
-        {visible.length===0 ? <p style={{ color: 'var(--text-muted)', padding:'2rem', textAlign:'center' }}>Sin resultados para «{search}»</p> : <ReactECharts option={ratioOption} style={{ height: h }} />}
-      </div>
-      <div className="chart-card">
-        <h3 className="chart-title">Funcionarios vs Ingresos por Establecimiento — {periodo}</h3>
-        <ReactECharts option={scatterOption} style={{ height: 320 }} />
-      </div>
+      <WidgetWrapper widgetKey="sr_sostenibilidad_ratio">
+        <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="chart-title">Ratio Remuneraciones / Ingresos por Establecimiento (%) — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#10b981' }}>■</span> Saludable &lt;50% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Moderado 50–70% &nbsp;<span style={{ color: '#ef4444' }}>■</span> Crítico &gt;70%
+          </p>
+          {visible.length === 0 ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p> : <ReactECharts option={ratioOption} style={{ height: h }} />}
+        </div>
+      </WidgetWrapper>
+      <WidgetWrapper widgetKey="sr_sostenibilidad_scatter">
+        <div className="chart-card">
+          <h3 className="chart-title">Funcionarios vs Ingresos por Establecimiento — {periodo}</h3>
+          <ReactECharts option={scatterOption} style={{ height: 320 }} />
+        </div>
+      </WidgetWrapper>
     </>
   )
 }
 
 // ── Tab: Riesgo ────────────────────────────────────────────────────────────────
-function TabRiesgo({ rdbData, periodo }) {
+function TabRiesgo({ rdbData, periodo, widgetFilter = null }) {
   const C = useChartColors()
   const [searchTerm, setSearchTerm] = useState('')
   const [riesgoFilter, setRiesgoFilter] = useState('all')
@@ -1445,8 +1928,65 @@ function TabRiesgo({ rdbData, periodo }) {
     currentPage * ITEMS_PER_PAGE
   )
 
+  const sqlStr = `SELECT
+    er.rbd,
+    eo.nom_rbd,
+    COALESCE(docs.total_docs, 0) AS total_docs,
+    SUM(er.monto_declarado) AS monto_total,
+    COALESCE(SUM(er.monto_declarado) FILTER (
+        WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+    ), 0) AS monto_rendido,
+    COALESCE(SUM(er.monto_declarado) FILTER (
+        WHERE UPPER(TRIM(er.desc_estado)) != 'RENDIDO'
+    ), 0) AS monto_no_rendido,
+    ROUND(100.0 * COALESCE(SUM(er.monto_declarado) FILTER (
+        WHERE UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+    ), 0) / NULLIF(SUM(er.monto_declarado), 0), 1) AS pct_rendido,
+    ROUND(100.0 * COALESCE(SUM(er.monto_declarado) FILTER (
+        WHERE UPPER(TRIM(er.desc_estado)) != 'RENDIDO'
+    ), 0) / NULLIF(SUM(er.monto_declarado), 0), 1) AS pct_no_rendido
+FROM estado_resultado er
+JOIN dim_establecimiento_oficial eo ON eo.rbd = er.rbd AND eo.agno = er.periodo
+LEFT JOIN (
+    SELECT rbd, COUNT(*) AS total_docs
+    FROM documentos
+    WHERE sost_id = :sid
+      AND periodo = :per
+    GROUP BY rbd
+) docs ON docs.rbd = er.rbd
+WHERE er.sost_id = :sid
+  AND er.periodo = :per
+GROUP BY er.rbd, eo.nom_rbd, docs.total_docs
+HAVING SUM(er.monto_declarado) > 0
+ORDER BY pct_rendido ASC NULLS LAST`
+
+  // ── Early return para el tab Resumen ─────────────────────────────────────
+  if (widgetFilter === 'sr_acreditacion_grafico') {
+    return (
+      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+        <h3 className="chart-title">Acreditación de Saldos por Establecimiento (%) — {periodo}</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Ordenado por % rendido ascendente.</p>
+        {chartVisible.length === 0
+          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados.</p>
+          : <ReactECharts option={acredOption} style={{ height: h }} />
+        }
+      </div>
+    )
+  }
+  if (widgetFilter === 'sr_acreditacion_monto') {
+    return montoOpt
+      ? (
+        <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+          <h3 className="chart-title">Top 20 — Monto No Rendido por Establecimiento ({unitLabel}) — {periodo}</h3>
+          <ReactECharts option={montoOpt} style={{ height: 520 }} />
+        </div>
+      )
+      : <div style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos de monto no rendido.</div>
+  }
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="✅" label="EE Riesgo Bajo" value={fmtN(bajos)} color="#10b981" sub="≥90% rendido" />
         <KPICard icon="🟡" label="EE Riesgo Moderado" value={fmtN(moderados)} color="#f59e0b" sub="70–90% rendido" />
@@ -1454,25 +1994,30 @@ function TabRiesgo({ rdbData, periodo }) {
         <KPICard icon="💸" label="Total No Rendido" value={fmtAmt(totalNR)} color={totalNR > 0 ? '#ef4444' : '#10b981'}
           sub={peorEE ? `Más bajo: ${shortName(peorEE.nom_rbd, peorEE.rbd)} (${Number(peorEE.pct_rendido).toFixed(0)}%)` : ''} />
       </div>
-      <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-        <h3 className="chart-title">Acreditación de Saldos por Establecimiento (%) — {periodo}</h3>
-        <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.75rem', flexWrap:'wrap' }}>
-          <span style={{ fontSize:'0.78rem', color: 'var(--text-muted)' }}>Ordenado por % rendido ascendente. <span style={{ color:'#10b981' }}>■</span> Rendido &nbsp;<span style={{ color:'var(--surface-overlay)', border:'1px solid var(--line-subtle)', display:'inline-block', width:10, height:10, verticalAlign:'middle' }}></span> No rendido</span>
-          <span style={{ fontSize:'0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{chartFiltered.length===0?0:chartSafePage*10+1}–{Math.min((chartSafePage+1)*10,chartFiltered.length)}</b> de <b style={{ color: C.axisLabel }}>{chartFiltered.length}</b></span>
-          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'0.4rem' }}>
-            <button disabled={chartSafePage===0} onClick={() => setChartPage(p=>p-1)} style={{ padding:'0.3rem 0.6rem', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', background: chartSafePage===0?'var(--surface-base)':'var(--surface-overlay)', color: chartSafePage===0?'var(--text-muted)':'var(--text-primary)', cursor: chartSafePage===0?'not-allowed':'pointer', fontSize:'0.78rem' }}>← Anterior</button>
-            <span style={{ color: 'var(--text-muted)', fontSize:'0.78rem', minWidth:56, textAlign:'center' }}>{chartSafePage+1} / {chartTotalPages}</span>
-            <button disabled={chartSafePage>=chartTotalPages-1} onClick={() => setChartPage(p=>p+1)} style={{ padding:'0.3rem 0.6rem', border:'1px solid var(--line-subtle)', borderRadius:'0.375rem', background: chartSafePage>=chartTotalPages-1?'var(--surface-base)':'var(--surface-overlay)', color: chartSafePage>=chartTotalPages-1?'var(--text-muted)':'var(--text-primary)', cursor: chartSafePage>=chartTotalPages-1?'not-allowed':'pointer', fontSize:'0.78rem' }}>Siguiente →</button>
-          </div>
-        </div>
-        {chartVisible.length===0 ? <p style={{ color: 'var(--text-muted)', padding:'2rem', textAlign:'center' }}>Sin resultados para «{searchTerm}»</p> : <ReactECharts option={acredOption} style={{ height: h }} />}
-      </div>
-      {montoOpt && (
+      <WidgetWrapper widgetKey="sr_acreditacion_grafico">
         <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
-          <h3 className="chart-title">Top 20 — Monto No Rendido por Establecimiento ({unitLabel}) — {periodo}</h3>
-          <ReactECharts option={montoOpt} style={{ height: 520 }} />
+          <h3 className="chart-title">Acreditación de Saldos por Establecimiento (%) — {periodo}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Ordenado por % rendido ascendente. <span style={{ color: '#10b981' }}>■</span> Rendido &nbsp;<span style={{ color: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)', display: 'inline-block', width: 10, height: 10, verticalAlign: 'middle' }}></span> No rendido</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Mostrando <b style={{ color: C.axisLabel }}>{chartFiltered.length === 0 ? 0 : chartSafePage * 10 + 1}–{Math.min((chartSafePage + 1) * 10, chartFiltered.length)}</b> de <b style={{ color: C.axisLabel }}>{chartFiltered.length}</b></span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <button disabled={chartSafePage === 0} onClick={() => setChartPage(p => p - 1)} style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', background: chartSafePage === 0 ? 'var(--surface-base)' : 'var(--surface-overlay)', color: chartSafePage === 0 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: chartSafePage === 0 ? 'not-allowed' : 'pointer', fontSize: '0.78rem' }}>← Anterior</button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 56, textAlign: 'center' }}>{chartSafePage + 1} / {chartTotalPages}</span>
+              <button disabled={chartSafePage >= chartTotalPages - 1} onClick={() => setChartPage(p => p + 1)} style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--line-subtle)', borderRadius: '0.375rem', background: chartSafePage >= chartTotalPages - 1 ? 'var(--surface-base)' : 'var(--surface-overlay)', color: chartSafePage >= chartTotalPages - 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: chartSafePage >= chartTotalPages - 1 ? 'not-allowed' : 'pointer', fontSize: '0.78rem' }}>Siguiente →</button>
+            </div>
+          </div>
+          {chartVisible.length === 0 ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{searchTerm}»</p> : <ReactECharts option={acredOption} style={{ height: h }} />}
         </div>
+      </WidgetWrapper>
+      {montoOpt && (
+        <WidgetWrapper widgetKey="sr_acreditacion_monto">
+          <div className="chart-card" style={{ marginBottom: '1.25rem' }}>
+            <h3 className="chart-title">Top 20 — Monto No Rendido por Establecimiento ({unitLabel}) — {periodo}</h3>
+            <ReactECharts option={montoOpt} style={{ height: 520 }} />
+          </div>
+        </WidgetWrapper>
       )}
+
       <div className="chart-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <h3 className="chart-title" style={{ margin: 0 }}>Detalle de Acreditación por Establecimiento ({fmtN(tableData.length)} resultados)</h3>
@@ -1555,9 +2100,9 @@ function TabSostenibilidadRiesgo({ rdbData, periodo, sostId }) {
   }, [])
 
   const SUB_TABS = [
-    { key: 'acreditacion',  label: 'Acreditación de Saldos',      icon: '📊', color: '#6366f1' },
+    { key: 'acreditacion', label: 'Acreditación de Saldos', icon: '📊', color: '#6366f1' },
     { key: 'sostenibilidad', label: 'Sostenibilidad Rem./Ingreso', icon: '🛡️', color: '#10b981' },
-    { key: 'hhi',           label: 'HHI de Fuentes de Ingreso',   icon: '💰', color: '#f59e0b' },
+    { key: 'hhi', label: 'HHI de Fuentes de Ingreso', icon: '💰', color: '#f59e0b' },
   ]
 
   return (
@@ -1596,32 +2141,32 @@ function TabSostenibilidadRiesgo({ rdbData, periodo, sostId }) {
         })}
       </div>
 
-      {subTab === 'acreditacion'   && <TabRiesgo rdbData={rdbData} periodo={periodo} />}
-      {subTab === 'sostenibilidad'  && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
-      {subTab === 'hhi'             && <RenderHHISostenedor sostId={sostId} periodo={periodo} />}
+      {subTab === 'acreditacion' && <TabRiesgo rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'sostenibilidad' && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'hhi' && <RenderHHISostenedor sostId={sostId} periodo={periodo} />}
     </div>
   )
 }
 
 // ── Sub-tab: HHI de Fuentes de Ingreso (vista sostenedor) ───────────────────
 const HHI_COLOR_MAP = {
-  'Concentración Baja':     '#10b981',
+  'Concentración Baja': '#10b981',
   'Concentración Moderada': '#f59e0b',
-  'Concentración Alta':     '#ef4444',
+  'Concentración Alta': '#ef4444',
 }
 const FUENTE_COLOR_SOST = {
   GENERAL: '#6366f1', SEP: '#10b981', PIE: '#f59e0b', ACG: '#06b6d4',
   MANTENIMIENTO: '#8b5cf6', PRORETENCION: '#ec4899', INTERNADO: '#14b8a6', AC: '#f97316',
 }
-const FUENTE_COLOR_DEF = ['#84cc16','#a78bfa','#fb923c','#38bdf8','#fb7185']
+const FUENTE_COLOR_DEF = ['#84cc16', '#a78bfa', '#fb923c', '#38bdf8', '#fb7185']
 function getFColor(alias, i) { return FUENTE_COLOR_SOST[alias] ?? FUENTE_COLOR_DEF[i % FUENTE_COLOR_DEF.length] }
 function hhiLabel(hhi) {
-  if (hhi < 1500) return { label: 'Concentración Baja',     color: '#10b981', icon: '🟢' }
+  if (hhi < 1500) return { label: 'Concentración Baja', color: '#10b981', icon: '🟢' }
   if (hhi < 2500) return { label: 'Concentración Moderada', color: '#f59e0b', icon: '🟡' }
-  return              { label: 'Concentración Alta',     color: '#ef4444', icon: '🔴' }
+  return { label: 'Concentración Alta', color: '#ef4444', icon: '🔴' }
 }
 
-function RenderHHISostenedor({ sostId, periodo }) {
+function RenderHHISostenedor({ sostId, periodo, widgetFilter = null }) {
   const { fmtAmt } = useMoneyFmt()
   const C = useChartColors()
   const [data, setData] = useState(null)
@@ -1727,8 +2272,122 @@ function RenderHHISostenedor({ sostId, periodo }) {
     backgroundColor: 'transparent',
   }
 
+  const sqlStr = `-- Serie temporal HHI del sostenedor
+SELECT periodo, hhi, nivel_concentracion, orden_concentracion,
+       n_fuentes, monto_total, fuente_principal, pct_fuente_principal
+FROM mv_hhi_fuentes
+WHERE sost_id = :sid AND periodo = :p
+ORDER BY periodo;
+
+-- Fuentes de ingreso del sostenedor (participación por fuente)
+SELECT subvencion_alias,
+       SUM(monto_declarado)  AS monto_total,
+       ROUND(
+           SUM(monto_declarado) * 100.0 /
+           NULLIF(SUM(SUM(monto_declarado)) OVER (), 0)
+       , 2) AS pct_participacion
+FROM estado_resultado
+WHERE sost_id = :sid
+  AND periodo  = :p
+  AND UPPER(TRIM(desc_tipo_cuenta)) LIKE '%INGRESO%'
+  AND UPPER(TRIM(desc_estado))      = 'RENDIDO'
+  AND cuenta_alias_padre LIKE '3%'
+  AND subvencion_alias IS NOT NULL
+  AND subvencion_alias <> ''
+GROUP BY subvencion_alias
+ORDER BY monto_total DESC;`
+
+  // ── Early return para el tab Resumen ─────────────────────────────────────
+  if (widgetFilter === 'sr_hhi_graficos') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+        <div className="chart-card">
+          <h3 className="chart-title">Distribución de Fuentes de Ingreso</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Período {ultimo?.periodo ?? ''} — datos rendidos</p>
+          <ReactECharts option={pieFuentesOpt} style={{ height: 320 }} />
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Evolución del HHI por Año</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Concentración de financiamiento — serie histórica</p>
+          <ReactECharts option={lineHHIOpt} style={{ height: 320 }} />
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'sr_hhi_fuentes') {
+    return (
+      <div className="chart-card">
+        <h3 className="chart-title">Composición de Fuentes de Ingreso (Rendido)</h3>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>Fuente (Subvención)</th><th>Monto Total</th><th>% Participación</th></tr></thead>
+            <tbody>
+              {fuentes.map((f, i) => (
+                <tr key={f.subvencion_alias}>
+                  <td>
+                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: getFColor(f.subvencion_alias, i), marginRight: 8 }} />
+                    {f.subvencion_alias}
+                  </td>
+                  <td style={{ color: '#10b981' }}>{fmtAmt(f.monto_total)}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 80, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(Number(f.pct_participacion), 100)}%`, height: '100%', background: getFColor(f.subvencion_alias, i), borderRadius: 3 }} />
+                      </div>
+                      <strong style={{ color: getFColor(f.subvencion_alias, i) }}>{Number(f.pct_participacion).toFixed(1)}%</strong>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'sr_hhi_detalle') {
+    return (
+      <div className="chart-card">
+        <h3 className="chart-title">Detalle HHI por Período</h3>
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr><th>Año</th><th>HHI</th><th>Nivel</th><th>N° Fuentes</th><th>Fuente Principal</th><th>% F. Principal</th><th>Monto Total</th></tr>
+            </thead>
+            <tbody>
+              {[...hhi_serie].reverse().map(d => {
+                const lbl = hhiLabel(Number(d.hhi))
+                return (
+                  <tr key={d.periodo}>
+                    <td><strong>{d.periodo}</strong></td>
+                    <td><strong style={{ color: lbl.color, fontSize: '1rem' }}>{fmtN(Math.round(Number(d.hhi)))}</strong></td>
+                    <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${lbl.color}20`, color: lbl.color, padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>{lbl.icon} {lbl.label}</span></td>
+                    <td>{Number(d.n_fuentes).toFixed(0)}</td>
+                    <td>{d.fuente_principal ?? '—'}</td>
+                    <td>{d.pct_fuente_principal != null ? `${Number(d.pct_fuente_principal).toFixed(1)}%` : '—'}</td>
+                    <td style={{ color: '#6366f1' }}>{fmtAmt(d.monto_total)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
+
+      {/* Nota metodológica */}
+      <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
+        ℹ️ <strong>Metodología HHI:</strong> HHI = Σ(pct_i²) en escala 0-10.000.
+        <span style={{ marginLeft: 12 }}>🟢 &lt;1.500 Concentración Baja</span>
+        <span style={{ marginLeft: 10 }}>🟡 1.500-2.500 Moderada</span>
+        <span style={{ marginLeft: 10 }}>🔴 &gt;2.500 Alta — alta vulnerabilidad financiera</span>
+      </div>
+
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="kpi-card" style={{ '--accent': hLabel.color }}>
@@ -1765,101 +2424,94 @@ function RenderHHISostenedor({ sostId, periodo }) {
         </div>
       </div>
 
-      {/* Nota metodológica */}
-      <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
-        ℹ️ <strong>Metodología HHI:</strong> HHI = Σ(pct_i²) en escala 0-10.000.
-        <span style={{ marginLeft: 12 }}>🟢 &lt;1.500 Concentración Baja</span>
-        <span style={{ marginLeft: 10 }}>🟡 1.500-2.500 Moderada</span>
-        <span style={{ marginLeft: 10 }}>🔴 &gt;2.500 Alta — alta vulnerabilidad financiera</span>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-        {/* Torta de fuentes */}
-        <div className="chart-card">
-          <h3 className="chart-title">Distribución de Fuentes de Ingreso</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Período {ultimo?.periodo ?? ''} — datos rendidos</p>
-          <ReactECharts option={pieFuentesOpt} style={{ height: 320 }} />
+      <WidgetWrapper widgetKey="sr_hhi_graficos">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+          <div className="chart-card">
+            <h3 className="chart-title">Distribución de Fuentes de Ingreso</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Período {ultimo?.periodo ?? ''} — datos rendidos</p>
+            <ReactECharts option={pieFuentesOpt} style={{ height: 320 }} />
+          </div>
+          <div className="chart-card">
+            <h3 className="chart-title">Evolución del HHI por Año</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Concentración de financiamiento — serie histórica</p>
+            <ReactECharts option={lineHHIOpt} style={{ height: 320 }} />
+          </div>
         </div>
+      </WidgetWrapper>
 
-        {/* Línea HHI histórico */}
+      <WidgetWrapper widgetKey="sr_hhi_fuentes">
         <div className="chart-card">
-          <h3 className="chart-title">Evolución del HHI por Año</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Concentración de financiamiento — serie histórica</p>
-          <ReactECharts option={lineHHIOpt} style={{ height: 320 }} />
-        </div>
-      </div>
-
-      {/* Tabla de fuentes */}
-      <div className="chart-card">
-        <h3 className="chart-title">Composición de Fuentes de Ingreso (Rendido)</h3>
-        <div className="table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Fuente (Subvención)</th>
-                <th>Monto Total</th>
-                <th>% Participación</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fuentes.map((f, i) => (
-                <tr key={f.subvencion_alias}>
-                  <td>
-                    <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: getFColor(f.subvencion_alias, i), marginRight: 8 }} />
-                    {f.subvencion_alias}
-                  </td>
-                  <td style={{ color: '#10b981' }}>{fmtAmt(f.monto_total)}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 80, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(Number(f.pct_participacion), 100)}%`, height: '100%', background: getFColor(f.subvencion_alias, i), borderRadius: 3 }} />
-                      </div>
-                      <strong style={{ color: getFColor(f.subvencion_alias, i) }}>
-                        {Number(f.pct_participacion).toFixed(1)}%
-                      </strong>
-                    </div>
-                  </td>
+          <h3 className="chart-title">Composición de Fuentes de Ingreso (Rendido)</h3>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Fuente (Subvención)</th>
+                  <th>Monto Total</th>
+                  <th>% Participación</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Serie temporal detallada */}
-      <div className="chart-card">
-        <h3 className="chart-title">Detalle HHI por Período</h3>
-        <div className="table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Año</th><th>HHI</th><th>Nivel</th><th>N° Fuentes</th>
-                <th>Fuente Principal</th><th>% F. Principal</th><th>Monto Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...hhi_serie].reverse().map(d => {
-                const lbl = hhiLabel(Number(d.hhi))
-                return (
-                  <tr key={d.periodo}>
-                    <td><strong>{d.periodo}</strong></td>
-                    <td><strong style={{ color: lbl.color, fontSize: '1rem' }}>{fmtN(Math.round(Number(d.hhi)))}</strong></td>
+              </thead>
+              <tbody>
+                {fuentes.map((f, i) => (
+                  <tr key={f.subvencion_alias}>
                     <td>
-                      <span style={{ display:'inline-flex', alignItems:'center', gap:6, background:`${lbl.color}20`, color:lbl.color, padding:'2px 10px', borderRadius:999, fontSize:'0.78rem', fontWeight:600 }}>
-                        {lbl.icon} {lbl.label}
-                      </span>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: getFColor(f.subvencion_alias, i), marginRight: 8 }} />
+                      {f.subvencion_alias}
                     </td>
-                    <td>{Number(d.n_fuentes).toFixed(0)}</td>
-                    <td>{d.fuente_principal ?? '—'}</td>
-                    <td>{d.pct_fuente_principal != null ? `${Number(d.pct_fuente_principal).toFixed(1)}%` : '—'}</td>
-                    <td style={{ color: '#6366f1' }}>{fmtAmt(d.monto_total)}</td>
+                    <td style={{ color: '#10b981' }}>{fmtAmt(f.monto_total)}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 80, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(Number(f.pct_participacion), 100)}%`, height: '100%', background: getFColor(f.subvencion_alias, i), borderRadius: 3 }} />
+                        </div>
+                        <strong style={{ color: getFColor(f.subvencion_alias, i) }}>
+                          {Number(f.pct_participacion).toFixed(1)}%
+                        </strong>
+                      </div>
+                    </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </WidgetWrapper>
+
+      <WidgetWrapper widgetKey="sr_hhi_detalle">
+        <div className="chart-card">
+          <h3 className="chart-title">Detalle HHI por Período</h3>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Año</th><th>HHI</th><th>Nivel</th><th>N° Fuentes</th>
+                  <th>Fuente Principal</th><th>% F. Principal</th><th>Monto Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...hhi_serie].reverse().map(d => {
+                  const lbl = hhiLabel(Number(d.hhi))
+                  return (
+                    <tr key={d.periodo}>
+                      <td><strong>{d.periodo}</strong></td>
+                      <td><strong style={{ color: lbl.color, fontSize: '1rem' }}>{fmtN(Math.round(Number(d.hhi)))}</strong></td>
+                      <td>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${lbl.color}20`, color: lbl.color, padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>
+                          {lbl.icon} {lbl.label}
+                        </span>
+                      </td>
+                      <td>{Number(d.n_fuentes).toFixed(0)}</td>
+                      <td>{d.fuente_principal ?? '—'}</td>
+                      <td>{d.pct_fuente_principal != null ? `${Number(d.pct_fuente_principal).toFixed(1)}%` : '—'}</td>
+                      <td style={{ color: '#6366f1' }}>{fmtAmt(d.monto_total)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </WidgetWrapper>
     </>
   )
 }
@@ -1874,7 +2526,7 @@ function TabTerritorio({ data, periodo, sostId }) {
     window.addEventListener('pirgefse-subtab', handler)
     return () => window.removeEventListener('pirgefse-subtab', handler)
   }, [])
-  
+
   return (
     <div>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--line-subtle)', paddingBottom: '0.5rem' }}>
@@ -1908,7 +2560,7 @@ function TabTerritorio({ data, periodo, sostId }) {
   )
 }
 
-function RenderComplejidadEducativa({ data, periodo }) {
+function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
   const C = useChartColors()
   const [search, setSearch] = useState('')
   const [nivelFilter, setNivelFilter] = useState('all')
@@ -1983,7 +2635,7 @@ function RenderComplejidadEducativa({ data, periodo }) {
   const comunasChart = [...por_comuna].slice(0, 15)
   const comunaOption = {
     tooltip: { trigger: 'axis', ...C.tooltip, formatter: params => { const d = comunasChart[params[0].dataIndex]; return `<b>${d.nom_comuna}</b><br/>IVE prom: <b>${(d.ive_promedio * 100).toFixed(1)}%</b><br/>EE: ${d.n_establecimientos} · Mat: ${fmtN(d.total_matricula)}` } },
-    grid: { left: 140, right: 80, top: 10, bottom: 10 },
+    grid: { left: 140, right: 80, top: 10, bottom: 20 },
     xAxis: { type: 'value', max: 1, axisLabel: { color: C.axisLabel, formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
     yAxis: { type: 'category', data: comunasChart.map(d => d.nom_comuna), axisLabel: { color: C.axisLabel, fontSize: 10, width: 130, overflow: 'truncate' } },
     series: [{ type: 'bar', barMaxWidth: 18, data: comunasChart.map(d => ({ value: d.ive_promedio, itemStyle: { color: iveColor(d.ive_promedio), borderRadius: [0, 4, 4, 0] } })), label: { show: true, position: 'right', formatter: p => `${(p.value * 100).toFixed(1)}%`, fontSize: 10, color: 'var(--text-primary)' } }],
@@ -2000,15 +2652,110 @@ function RenderComplejidadEducativa({ data, periodo }) {
   const prioOption = {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip },
     legend: { data: prioData.map(d => d.name), textStyle: { color: C.axisLabel, fontSize: 10 }, top: 0 },
-    grid: { left: 20, right: 20, top: 40, bottom: 10 },
+    grid: { left: 20, right: 20, top: 40, bottom: 20 },
     xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtN(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     yAxis: { type: 'category', data: ['Consolidado'], axisLabel: { color: C.axisLabel, fontSize: 11 } },
     series: prioData.map(d => ({ name: d.name, type: 'bar', stack: 'prio', barMaxWidth: 40, data: [d.value], itemStyle: { color: d.color }, label: { show: d.value > 0, position: 'inside', formatter: p => fmtN(p.value), fontSize: 10, color: '#fff', fontWeight: 600 } })),
     backgroundColor: 'transparent',
   }
 
+  const sqlStr = `SELECT
+    ive.rbd,
+    ive.nom_establecimiento,
+    ive.nivel,
+    ive.nom_region,
+    ive.nom_provincia,
+    ive.nom_comuna,
+    ive.nom_ruralidad,
+    ive.nom_tipo_dependencia,
+    ive.primera_prioridad,
+    ive.segunda_prioridad,
+    ive.tercera_prioridad,
+    ive.no_priorizado,
+    ive.sin_informacion,
+    ive.total_matricula,
+    ROUND(CAST(ive.ive_sinae AS NUMERIC), 4) AS ive_sinae,
+    eo.rural_rbd,
+    eo.convenio_pie,
+    eo.pace
+FROM dim_ive ive
+JOIN dim_establecimiento_oficial eo ON eo.rbd = ive.rbd AND eo.agno = ive.periodo
+WHERE eo.rut_sostenedor = :sid
+  AND ive.periodo = :agno
+ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
+
+  // ── Early return para el tab Resumen (solo fragmento específico) ─────────────
+  if (widgetFilter === 'te_complejidad_ive') {
+    return (
+      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+        <h3 className="chart-title">Top IVE por Establecimiento — {periodo}</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+          <span style={{ color: '#ef4444' }}>■</span> Alto ≥90% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Medio 70–90% &nbsp;<span style={{ color: '#10b981' }}>■</span> Bajo &lt;70%
+        </p>
+        {chartData.length === 0
+          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos para mostrar.</p>
+          : <ReactECharts option={iveBarOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+        }
+      </div>
+    )
+  }
+  if (widgetFilter === 'te_complejidad_matricula') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="chart-card">
+          <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
+          <ReactECharts option={donaOption} style={{ height: 220 }} />
+          <div style={{ marginTop: '0.5rem' }}>
+            {nivel_resumen.map(n => (
+              <div key={n.nivel} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.8rem' }}>
+                <span style={{ color: NIV_CLR[n.nivel] ?? 'var(--text-muted)', fontWeight: 600 }}>{n.nivel}</span>
+                <span style={{ color: C.axisLabel }}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat.</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
+          {comunasChart.length === 0
+            ? <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Sin datos.</p>
+            : <ReactECharts option={comunaOption} style={{ height: Math.max(220, comunasChart.length * 26) }} />
+          }
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'te_complejidad_prioridades') {
+    return (
+      <div className="chart-card">
+        <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
+        <ReactECharts option={prioOption} style={{ height: 100 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginTop: '1rem' }}>
+          {prioData.map(p => (
+            <div key={p.name} style={{ textAlign: 'center', background: 'var(--surface-overlay)', borderRadius: '0.5rem', padding: '0.6rem', border: '1px solid var(--line-subtle)' }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, color: p.color }}>{fmtN(p.value)}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{p.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
+
+      {/* Nota metodológica */}
+      <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
+        ℹ️ <strong>Metodología Complejidad Educativa:</strong> HHI = Σ(pct_i²) en escala 0-10.000.
+        <span style={{ marginLeft: 12 }}>🟢 &lt;1.500 Concentración Baja</span>
+        <span style={{ marginLeft: 10 }}>🟡 1.500-2.500 Moderada</span>
+        <span style={{ marginLeft: 10 }}>🔴 &gt;2.500 Alta — alta vulnerabilidad financiera</span>
+      </div>
+
+      {/* Indicadores */}
+
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="🗺️" label="Establec. con IVE" value={fmtN(total_ee)} color="#6366f1" />
         <KPICard icon="📊" label="IVE Promedio" value={`${(prom_ive * 100).toFixed(1)}%`} color={iveColor(prom_ive)} sub={iveLabel(prom_ive) + ' vulnerabilidad'} />
@@ -2047,100 +2794,106 @@ function RenderComplejidadEducativa({ data, periodo }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{h:'RBD',a:'left'},{h:'Nombre',a:'left'},{h:'Nivel',a:'center'},{h:'IVE',a:'center'},{h:'1ª Prior.',a:'right'},{h:'2ª Prior.',a:'right'},{h:'3ª Prior.',a:'right'},{h:'No Prior.',a:'right'},{h:'Total Mat.',a:'right'},{h:'Rural',a:'center'},{h:'Comuna',a:'left'}].map(({h,a})=>(
-                  <th key={h} style={{padding:'0.55rem 0.8rem',color: 'var(--text-muted)',fontWeight:600,textAlign:a,borderBottom: '1px solid var(--line-subtle)',whiteSpace:'nowrap'}}>{h}</th>
+                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre', a: 'left' }, { h: 'Nivel', a: 'center' }, { h: 'IVE', a: 'center' }, { h: '1ª Prior.', a: 'right' }, { h: '2ª Prior.', a: 'right' }, { h: '3ª Prior.', a: 'right' }, { h: 'No Prior.', a: 'right' }, { h: 'Total Mat.', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }].map(({ h, a }) => (
+                  <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 && <tr><td colSpan={11} style={{padding:'2rem',textAlign:'center',color: 'var(--text-muted)'}}>Sin resultados para «{search}»</td></tr>}
+              {paginated.length === 0 && <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
               {paginated.map((ee, i) => {
                 const ive = ee.ive_sinae ?? 0
                 const clr = iveColor(ive)
                 return (
-                  <tr key={`${ee.rbd}-${ee.nivel}`} style={{borderBottom: '1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                    <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd}</td>
-                    <td style={{padding:'0.45rem 0.8rem',color: 'var(--text-primary)',maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}><span title={ee.nom_establecimiento}>{ee.nom_establecimiento}</span></td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center'}}>
-                      <span style={{fontSize:'0.7rem',fontWeight:600,color:ee.nivel==='MEDIA'?'#34d399':'#60a5fa',background:ee.nivel==='MEDIA'?'#34d39922':'#60a5fa22',borderRadius:999,padding:'0.15rem 0.5rem',border:`1px solid ${ee.nivel==='MEDIA'?'#34d399':'#60a5fa'}`}}>{ee.nivel}</span>
+                  <tr key={`${ee.rbd}-${ee.nivel}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span title={ee.nom_establecimiento}>{ee.nom_establecimiento}</span></td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: ee.nivel === 'MEDIA' ? '#34d399' : '#60a5fa', background: ee.nivel === 'MEDIA' ? '#34d39922' : '#60a5fa22', borderRadius: 999, padding: '0.15rem 0.5rem', border: `1px solid ${ee.nivel === 'MEDIA' ? '#34d399' : '#60a5fa'}` }}>{ee.nivel}</span>
                     </td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center'}}>
-                      <span style={{fontSize:'0.78rem',fontWeight:700,color:clr,background:`${clr}22`,border:`1px solid ${clr}`,borderRadius:999,padding:'0.15rem 0.5rem'}}>{(ive*100).toFixed(1)}%</span>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: clr, background: `${clr}22`, border: `1px solid ${clr}`, borderRadius: 999, padding: '0.15rem 0.5rem' }}>{(ive * 100).toFixed(1)}%</span>
                     </td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#ef4444',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.primera_prioridad)}</td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#f59e0b',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.segunda_prioridad)}</td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#facc15',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.tercera_prioridad)}</td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.no_priorizado)}</td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color: 'var(--text-primary)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.total_matricula)}</td>
-                    <td style={{padding:'0.45rem 0.8rem',textAlign:'center',color:ee.rural_rbd===1?'#f59e0b':'var(--line-subtle)'}}>{ee.rural_rbd===1?'🌿':'·'}</td>
-                    <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontSize:'0.76rem'}}>{ee.nom_comuna}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#ef4444', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.primera_prioridad)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#f59e0b', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.segunda_prioridad)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#facc15', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.tercera_prioridad)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.no_priorizado)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.total_matricula)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : '·'}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_comuna}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
         </div>
-        <div style={{padding:'0.75rem 1.25rem',borderTop: '1px solid var(--line-subtle)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
-          <span style={{color: 'var(--text-muted)',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
-          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
-            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
-            <span style={{color: 'var(--text-muted)',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
-            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+        <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length}</span>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 60, textAlign: 'center' }}>Pág. {safePage} / {totalPages}</span>
+            <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
           </div>
         </div>
       </div>
 
-      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">Top 10 — IVE por Establecimiento (filtrado) — {periodo}</h3>
-        <p style={{color: 'var(--text-muted)',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
-          <span style={{color:'#ef4444'}}>■</span> Alto ≥90% &nbsp;<span style={{color:'#f59e0b'}}>■</span> Medio 70–90% &nbsp;<span style={{color:'#10b981'}}>■</span> Bajo &lt;70%
-        </p>
-        {chartData.length===0
-          ? <p style={{color: 'var(--text-muted)',padding:'2rem',textAlign:'center'}}>Sin datos para mostrar.</p>
-          : <ReactECharts option={iveBarOption} style={{height:Math.max(280,chartData.length*38)}} />
-        }
-      </div>
+      <WidgetWrapper widgetKey="te_complejidad_ive">
+        <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="chart-title">Top 10 — IVE por Establecimiento (filtrado) — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            <span style={{ color: '#ef4444' }}>■</span> Alto ≥90% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Medio 70–90% &nbsp;<span style={{ color: '#10b981' }}>■</span> Bajo &lt;70%
+          </p>
+          {chartData.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos para mostrar.</p>
+            : <ReactECharts option={iveBarOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+          }
+        </div>
+      </WidgetWrapper>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
+      <WidgetWrapper widgetKey="te_complejidad_matricula">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div className="chart-card">
+            <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
+            <ReactECharts option={donaOption} style={{ height: 220 }} />
+            <div style={{ marginTop: '0.5rem' }}>
+              {nivel_resumen.map(n => (
+                <div key={n.nivel} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.8rem' }}>
+                  <span style={{ color: NIV_CLR[n.nivel] ?? 'var(--text-muted)', fontWeight: 600 }}>{n.nivel}</span>
+                  <span style={{ color: C.axisLabel }}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat. · IVE: <b style={{ color: iveColor(n.ive_promedio) }}>{(n.ive_promedio * 100).toFixed(1)}%</b></span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="chart-card">
+            <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
+            {comunasChart.length === 0
+              ? <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Sin datos.</p>
+              : <ReactECharts option={comunaOption} style={{ height: Math.max(220, comunasChart.length * 26) }} />
+            }
+          </div>
+        </div>
+      </WidgetWrapper>
+
+      <WidgetWrapper widgetKey="te_complejidad_prioridades">
         <div className="chart-card">
-          <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
-          <ReactECharts option={donaOption} style={{height:220}} />
-          <div style={{marginTop:'0.5rem'}}>
-            {nivel_resumen.map(n=>(
-              <div key={n.nivel} style={{display:'flex',justifyContent:'space-between',padding:'0.3rem 0',borderBottom: '1px solid var(--line-subtle)',fontSize:'0.8rem'}}>
-                <span style={{color:NIV_CLR[n.nivel]??'var(--text-muted)',fontWeight:600}}>{n.nivel}</span>
-                <span style={{color: C.axisLabel}}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat. · IVE: <b style={{color:iveColor(n.ive_promedio)}}>{(n.ive_promedio*100).toFixed(1)}%</b></span>
+          <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
+          <ReactECharts option={prioOption} style={{ height: 100 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginTop: '1rem' }}>
+            {prioData.map(p => (
+              <div key={p.name} style={{ textAlign: 'center', background: 'var(--surface-overlay)', borderRadius: '0.5rem', padding: '0.6rem', border: '1px solid var(--line-subtle)' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: p.color }}>{fmtN(p.value)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{p.name}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="chart-card">
-          <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
-          {comunasChart.length===0
-            ? <p style={{color: 'var(--text-muted)',textAlign:'center',padding:'2rem'}}>Sin datos.</p>
-            : <ReactECharts option={comunaOption} style={{height:Math.max(220,comunasChart.length*26)}} />
-          }
-        </div>
-      </div>
-
-      <div className="chart-card">
-        <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
-        <p style={{color: 'var(--text-muted)',fontSize:'0.78rem',marginBottom:'0.75rem'}}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
-        <ReactECharts option={prioOption} style={{height:100}} />
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5, 1fr)',gap:'0.75rem',marginTop:'1rem'}}>
-          {prioData.map(p=>(
-            <div key={p.name} style={{textAlign:'center',background: 'var(--surface-overlay)',borderRadius:'0.5rem',padding:'0.6rem',border: '1px solid var(--line-subtle)'}}>
-              <div style={{fontSize:'1.2rem',fontWeight:700,color:p.color}}>{fmtN(p.value)}</div>
-              <div style={{fontSize:'0.7rem',color: 'var(--text-muted)',marginTop:'0.2rem'}}>{p.name}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </WidgetWrapper>
     </>
   )
 }
 
-function RenderGastoEducativo({ sostId, periodo }) {
+function RenderGastoEducativo({ sostId, periodo, widgetFilter = null }) {
   const C = useChartColors()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -2170,7 +2923,7 @@ function RenderGastoEducativo({ sostId, periodo }) {
   const { gasto_establecimientos = [], gasto_por_cuenta = [], resumen = {} } = data
 
   const filterText = search.toLowerCase().trim()
-  const filtered = gasto_establecimientos.filter(ee => 
+  const filtered = gasto_establecimientos.filter(ee =>
     (ee.nombre_rbd ?? '').toLowerCase().includes(filterText) ||
     String(ee.rbd ?? '').includes(filterText)
   )
@@ -2210,27 +2963,122 @@ function RenderGastoEducativo({ sostId, periodo }) {
   const pieOption = {
     tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Monto: ${fmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
     legend: { orient: 'vertical', left: '55%', top: 'center', textStyle: { color: C.axisLabel, fontSize: 10 }, formatter: name => name.length > 40 ? name.slice(0, 38) + '...' : name },
-    series: [{ 
-      type: 'pie', radius: ['40%', '70%'], center: ['25%', '50%'], 
-      data: cuentaChart.map((c, i) => ({ name: c.categoria, value: c.total_gasto, itemStyle: { color: COLORS[i % COLORS.length] } })), 
-      label: { show: false }, emphasis: { label: { show: false } } 
+    series: [{
+      type: 'pie', radius: ['40%', '70%'], center: ['25%', '50%'],
+      data: cuentaChart.map((c, i) => ({ name: c.categoria, value: c.total_gasto, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      label: { show: false }, emphasis: { label: { show: false } }
     }],
     backgroundColor: 'transparent',
   }
 
-  return (
-    <>
+  const sqlStr = `-- Gasto por Establecimiento / Centro de costo
+SELECT 
+    d.rbd, 
+    d.nombre_rbd, 
+    SUM(d.monto_declarado) as total_gasto,
+    COUNT(d.id) as num_documentos,
+    eo.estado_estab, 
+    eo.matricula,
+    eo.rural_rbd,
+    eo.cod_com_rbd,
+    eo.nom_com_rbd
+FROM documentos d
+LEFT JOIN dim_establecimiento_oficial eo ON d.rbd = eo.rbd AND eo.agno = d.periodo
+WHERE d.sost_id = :sid AND d.periodo = :agno
+GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
+ORDER BY total_gasto DESC NULLS LAST;
+
+-- Gasto por Cuenta Padre
+SELECT 
+    COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN') as categoria, 
+    SUM(monto_declarado) as total_gasto
+FROM documentos
+WHERE sost_id = :sid AND periodo = :agno
+GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN')
+ORDER BY total_gasto DESC NULLS LAST;`
+
+  // ── Early return para el tab Resumen (solo fragmento específico) ─────────────
+  if (widgetFilter === 'te_gasto_kpis') {
+    if (!resumen) return <div className="loading-area"><div className="spinner" /></div>
+    return (
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.total_centros)} color="#8b5cf6" sub="Establec. + Adm. Central" />
         <KPICard icon="💵" label="Gasto Total" value={fmt(resumen.total_gasto)} color="#10b981" />
         <KPICard icon="📄" label="Documentos" value={fmtN(resumen.total_documentos)} color="#3b82f6" />
         <KPICard icon="📊" label="Promedio por Centro" value={fmt(resumen.total_centros ? resumen.total_gasto / resumen.total_centros : 0)} color="#f59e0b" />
       </div>
+    )
+  }
+  if (widgetFilter === 'te_gasto_tabla') {
+    if (!paginated) return <div className="loading-area"><div className="spinner" /></div>
+    return (
+      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+          <h3 className="chart-title" style={{ margin: 0 }}>Gasto por Centro de Costo — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-overlay)' }}>
+                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
+                  <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+              {paginated.map((ee, i) => (
+                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                  <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
+                  </td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel }}>{fmtN(ee.num_documentos)}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : (ee.rbd ? '·' : '')}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_com_rbd || ''}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 700 }}>{fmt(ee.total_gasto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (widgetFilter === 'te_gasto_graficos') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="chart-card">
+          <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
+          {chartData.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+            : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+          }
+        </div>
+        <div className="chart-card">
+          <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
+          <ReactECharts option={pieOption} style={{ height: 300 }} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <SqlViewer sql={sqlStr} />
+      <WidgetWrapper widgetKey="te_gasto_kpis">
+        <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+          <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.total_centros)} color="#8b5cf6" sub="Establec. + Adm. Central" />
+          <KPICard icon="💵" label="Gasto Total" value={fmt(resumen.total_gasto)} color="#10b981" />
+          <KPICard icon="📄" label="Documentos" value={fmtN(resumen.total_documentos)} color="#3b82f6" />
+          <KPICard icon="📊" label="Promedio por Centro" value={fmt(resumen.total_centros ? resumen.total_gasto / resumen.total_centros : 0)} color="#f59e0b" />
+        </div>
+      </WidgetWrapper>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por centro de costo o RBD..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 280 }} />
         {search && <button onClick={() => setSearch('')} style={pgBtn(false)}>✕ Limpiar</button>}
-        
+
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           Mostrando <b style={{ color: C.axisLabel }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)}</b> de <b style={{ color: C.axisLabel }}>{filtered.length}</b>
         </span>
@@ -2241,67 +3089,71 @@ function RenderGastoEducativo({ sostId, periodo }) {
         </div>
       </div>
 
-      <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
-        <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>Gasto por Centro de Costo — {periodo} ({fmtN(filtered.length)} resultados)</h3>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{h:'RBD',a:'left'},{h:'Nombre / Centro Costo',a:'left'},{h:'Nº Docs',a:'right'},{h:'Rural',a:'center'},{h:'Comuna',a:'left'},{h:'Monto Total',a:'right'}].map(({h,a})=>(
-                  <th key={h} style={{padding:'0.55rem 0.8rem',color: 'var(--text-muted)',fontWeight:600,textAlign:a,borderBottom: '1px solid var(--line-subtle)',whiteSpace:'nowrap'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.length === 0 && <tr><td colSpan={6} style={{padding:'2rem',textAlign:'center',color: 'var(--text-muted)'}}>Sin resultados para «{search}»</td></tr>}
-              {paginated.map((ee, i) => (
-                <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{borderBottom: '1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                  <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontFamily:'monospace',fontSize:'0.76rem'}}>{ee.rbd || 'N/A'}</td>
-                  <td style={{padding:'0.45rem 0.8rem',color: 'var(--text-primary)',maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
-                  </td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color: C.axisLabel,fontVariantNumeric:'tabular-nums'}}>{fmtN(ee.num_documentos)}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'center',color:ee.rural_rbd===1?'#f59e0b':'var(--line-subtle)'}}>{ee.rural_rbd===1?'🌿':(ee.rbd? '·' : '')}</td>
-                  <td style={{padding:'0.45rem 0.8rem',color: C.axisLabel,fontSize:'0.76rem'}}>{ee.nom_comuna || ''}</td>
-                  <td style={{padding:'0.45rem 0.8rem',textAlign:'right',color:'#10b981',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{fmt(ee.total_gasto)}</td>
+      <WidgetWrapper widgetKey="te_gasto_tabla">
+        <div className="chart-card" style={{ padding: 0, marginBottom: '1.5rem' }}>
+          <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--line-subtle)' }}>
+            <h3 className="chart-title" style={{ margin: 0 }}>Gasto por Centro de Costo — {periodo} ({fmtN(filtered.length)} resultados)</h3>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-overlay)' }}>
+                  {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
+                    <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{padding:'0.75rem 1.25rem',borderTop: '1px solid var(--line-subtle)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'0.5rem'}}>
-          <span style={{color: 'var(--text-muted)',fontSize:'0.78rem'}}>{filtered.length===0?0:(safePage-1)*ITEMS_PER_PAGE+1}–{Math.min(safePage*ITEMS_PER_PAGE,filtered.length)} de {filtered.length}</span>
-          <div style={{display:'flex',gap:'0.4rem',alignItems:'center'}}>
-            <button disabled={safePage<=1} onClick={()=>setPage(p=>p-1)} style={pgBtn(safePage<=1)}>← Anterior</button>
-            <span style={{color: 'var(--text-muted)',fontSize:'0.78rem',minWidth:60,textAlign:'center'}}>Pág. {safePage} / {totalPages}</span>
-            <button disabled={safePage>=totalPages} onClick={()=>setPage(p=>p+1)} style={pgBtn(safePage>=totalPages)}>Siguiente →</button>
+              </thead>
+              <tbody>
+                {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+                {paginated.map((ee, i) => (
+                  <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span title={ee.nombre_rbd}>{ee.nombre_rbd}</span>
+                    </td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.num_documentos)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : (ee.rbd ? '·' : '')}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_com_rbd || ''}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(ee.total_gasto)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length}</span>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <button disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} style={pgBtn(safePage <= 1)}>← Anterior</button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', minWidth: 60, textAlign: 'center' }}>Pág. {safePage} / {totalPages}</span>
+              <button disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} style={pgBtn(safePage >= totalPages)}>Siguiente →</button>
+            </div>
           </div>
         </div>
-      </div>
+      </WidgetWrapper>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.25rem',marginBottom:'1.5rem'}}>
-        <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
-          {chartData.length===0
-            ? <p style={{color: 'var(--text-muted)',padding:'2rem',textAlign:'center'}}>Sin datos.</p>
-            : <ReactECharts option={barOption} style={{height:Math.max(280,chartData.length*38)}} />
-          }
-        </div>
-        <div className="chart-card">
-          <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
-          <ReactECharts option={pieOption} style={{height:300}} />
-          <div style={{marginTop:'0.5rem', maxHeight:'200px', overflowY:'auto'}}>
-            {cuentaChart.map((c, i) => (
-              <div key={c.categoria} style={{display:'flex',justifyContent:'space-between',padding:'0.3rem 0',borderBottom: '1px solid var(--line-subtle)',fontSize:'0.75rem'}}>
-                <span style={{color:COLORS[i % COLORS.length] || 'var(--text-muted)', fontWeight:600, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}} title={c.categoria}>{c.categoria}</span>
-                <span style={{color: 'var(--text-primary)', fontWeight:600, marginLeft:'0.5rem'}}>{fmt(c.total_gasto)}</span>
-              </div>
-            ))}
+      <WidgetWrapper widgetKey="te_gasto_graficos">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div className="chart-card">
+            <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
+            {chartData.length === 0
+              ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
+              : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
+            }
+          </div>
+          <div className="chart-card">
+            <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
+            <ReactECharts option={pieOption} style={{ height: 300 }} />
+            <div style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+              {cuentaChart.map((c, i) => (
+                <div key={c.categoria} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.75rem' }}>
+                  <span style={{ color: COLORS[i % COLORS.length] || 'var(--text-muted)', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.categoria}>{c.categoria}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, marginLeft: '0.5rem' }}>{fmt(c.total_gasto)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </WidgetWrapper>
     </>
   )
 }
@@ -2317,8 +3169,8 @@ function TabComportamientoFinanciero({ periodo, sostId }) {
   }, [])
 
   const SUB_TABS = [
-    { key: 'gasto_rem',          label: 'Gastos Rem. sobre Ingreso Dep.',  icon: '📈', color: '#f59e0b' },
-    { key: 'analisis_rendicion', label: 'Análisis Rendición',              icon: '📋', color: '#6366f1' },
+    { key: 'gasto_rem', label: 'Gastos Rem. sobre Ingreso Dep.', icon: '📈', color: '#f59e0b' },
+    { key: 'analisis_rendicion', label: 'Análisis Rendición', icon: '📋', color: '#6366f1' },
   ]
 
   return (
@@ -2344,8 +3196,392 @@ function TabComportamientoFinanciero({ periodo, sostId }) {
         })}
       </div>
 
-      {subTab === 'gasto_rem'          && <GastoRemIngresoEstablecimiento sostId={sostId} periodo={periodo} />}
-      {subTab === 'analisis_rendicion' && <AnalisisRendicion sostId={sostId} periodo={periodo} />}
+      {subTab === 'gasto_rem' && (
+        <WidgetWrapper widgetKey="cf_gasto_rem">
+          <GastoRemIngresoEstablecimiento sostId={sostId} periodo={periodo} />
+        </WidgetWrapper>
+      )}
+      {subTab === 'analisis_rendicion' && (
+        <WidgetWrapper widgetKey="cf_analisis_rendicion">
+          <AnalisisRendicion sostId={sostId} periodo={periodo} />
+        </WidgetWrapper>
+      )}
     </div>
   )
+}
+
+// ── Tab: Resumen Personalizado del Sostenedor ─────────────────────────────────
+function TabResumenSostenedor({ rdbData, territorioData, periodo, sostId, loadingRbd }) {
+  const { pins, togglePin } = usePins()
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
+
+  // Grupos del catálogo para mostrar panel de selección
+  const grupos = [...new Set(SOSTENEDOR_WIDGETS.map(w => w.grupo))]
+
+  if (pins.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 420, gap: '1.5rem', padding: '3rem' }}>
+        <div style={{ fontSize: '4rem' }}>📌</div>
+        <h3 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>Tu Resumen está vacío</h3>
+        <p style={{ color: 'var(--text-muted)', textAlign: 'center', maxWidth: 480, margin: 0, lineHeight: 1.6 }}>
+          Navega a cualquier sección (Educativo-Financiero, Eficiencia, Sostenibilidad, etc.) y presiona el botón
+          {' '}<strong style={{ color: '#6366f1' }}>📌 Agregar al Resumen</strong>{' '}
+          en los gráficos o tablas que quieras ver aquí.
+        </p>
+        {/* Panel rápido de selección */}
+        <div style={{ width: '100%', maxWidth: 720, marginTop: '1rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.75rem', textAlign: 'center' }}>
+            O agrega indicadores directamente desde aquí:
+          </p>
+          {grupos.map(grupo => (
+            <div key={grupo} style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{grupo}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {SOSTENEDOR_WIDGETS.filter(w => w.grupo === grupo).map(w => (
+                  <button
+                    key={w.key}
+                    onClick={() => togglePin(w.key)}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      borderRadius: '999px',
+                      border: `1.5px solid ${w.color}44`,
+                      background: `${w.color}10`,
+                      color: w.color,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span>{w.icon}</span> {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Renderizar los widgets pinneados en orden
+  return (
+    <div>
+      {/* Header con conteo y botón para editar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ fontSize: '1.1rem' }}>📌</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9rem' }}>
+            {pins.length} indicador{pins.length !== 1 ? 'es' : ''} en tu Resumen
+          </span>
+        </div>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+          · Año seleccionado: <strong>{periodo}</strong>
+        </span>
+      </div>
+
+      {/* Panel de selección rápida para agregar más */}
+      <details style={{ marginBottom: '1.5rem' }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 600, padding: '0.5rem 0', userSelect: 'none' }}>
+          ➕ Agregar / quitar indicadores
+        </summary>
+        <div style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--surface-overlay)', borderRadius: '0.5rem', border: '1px solid var(--line-subtle)' }}>
+          {grupos.map(grupo => (
+            <div key={grupo} style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>{grupo}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {SOSTENEDOR_WIDGETS.filter(w => w.grupo === grupo).map(w => {
+                  const pinned = pins.includes(w.key)
+                  return (
+                    <button
+                      key={w.key}
+                      onClick={() => togglePin(w.key)}
+                      style={{
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '999px',
+                        border: pinned ? `1.5px solid ${w.color}` : `1.5px solid ${w.color}44`,
+                        background: pinned ? `${w.color}22` : `${w.color}08`,
+                        color: pinned ? w.color : `${w.color}99`,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {pinned ? '📌' : '○'} {w.icon} {w.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      {/* Renderizar cada widget pinneado */}
+      {pins.map(key => {
+        const widget = WIDGET_MAP[key]
+        if (!widget) return null
+        return (
+          <ResumenWidgetCard
+            key={key}
+            widget={widget}
+            rdbData={rdbData}
+            territorioData={territorioData}
+            periodo={periodo}
+            sostId={sostId}
+            loadingRbd={loadingRbd}
+            onUnpin={() => togglePin(key)}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Tarjeta contenedora de widget en el Resumen ────────────────────────────────
+function ResumenWidgetCard({ widget, rdbData, territorioData, periodo, sostId, loadingRbd, onUnpin }) {
+  const content = renderWidgetContent(widget.key, { rdbData, territorioData, periodo, sostId, loadingRbd })
+  if (!content) return null
+
+  return (
+    <div style={{
+      marginBottom: '1.5rem',
+      border: `1px solid ${widget.color}44`,
+      borderRadius: '0.75rem',
+      overflow: 'hidden',
+      boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+    }}>
+      {/* Header de la card */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0.75rem 1.25rem',
+        background: `${widget.color}10`,
+        borderBottom: `1px solid ${widget.color}30`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1.1rem' }}>{widget.icon}</span>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.92rem' }}>{widget.label}</span>
+          <span style={{
+            fontSize: '0.68rem', fontWeight: 600, color: widget.color,
+            background: `${widget.color}18`, border: `1px solid ${widget.color}44`,
+            borderRadius: '999px', padding: '0.1rem 0.5rem',
+          }}>
+            {widget.grupo}
+          </span>
+        </div>
+        <button
+          onClick={onUnpin}
+          title="Quitar del Resumen"
+          style={{
+            padding: '0.25rem 0.6rem',
+            borderRadius: '999px',
+            border: '1px solid var(--line-subtle)',
+            background: 'var(--surface-overlay)',
+            color: 'var(--text-muted)',
+            fontSize: '0.72rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            transition: 'all 0.15s',
+          }}
+        >
+          🗑️ Quitar
+        </button>
+      </div>
+      {/* Contenido */}
+      <div style={{ padding: '1.25rem' }}>
+        {content}
+      </div>
+    </div>
+  )
+}
+
+// ── Función que devuelve el contenido JSX según el widget key ─────────────────
+function renderWidgetContent(key, { rdbData, territorioData, periodo, sostId, loadingRbd }) {
+  if (loadingRbd && (key.startsWith('ef_') || key.startsWith('eg_') || key.startsWith('sr_'))) {
+    return <div className="loading-area" style={{ minHeight: 120 }}><div className="spinner" /></div>
+  }
+
+  switch (key) {
+    // ── Educativo-Financiero ──────────────────────────────────────────────────
+    case 'ef_ingreso_gasto':
+    case 'ef_superavit':
+    case 'ef_remuneraciones':
+      return <RenderFinancieroWidget rdbData={rdbData} periodo={periodo} widgetKey={key} />
+    case 'ef_sned':
+      return <SNEDSostenedor sostId={sostId} periodo={periodo} />
+    // ── Eficiencia ────────────────────────────────────────────────────────────
+    case 'eg_distribucion_gasto':
+    case 'eg_nivel_admin':
+      return <RenderInnovacionPedagogicaWidget rdbData={rdbData} periodo={periodo} widgetKey={key} />
+    case 'eg_costo_alumno_kpis':
+    case 'eg_costo_alumno_tabla':
+    case 'eg_costo_alumno_graficos':
+      return <RenderCostoAlumno sostId={sostId} periodo={periodo} widgetFilter={key} />
+    case 'eg_gasto_adm_kpis':
+    case 'eg_gasto_adm_tabla':
+    case 'eg_gasto_adm_graficos':
+      return <RenderGastoAdministrativo sostId={sostId} periodo={periodo} widgetFilter={key} />
+    // ── Sostenibilidad y Riesgo ───────────────────────────────────────────────
+    case 'sr_acreditacion_grafico':
+    case 'sr_acreditacion_monto':
+      return <TabRiesgo rdbData={rdbData} periodo={periodo} widgetFilter={key} />
+    case 'sr_sostenibilidad_ratio':
+    case 'sr_sostenibilidad_scatter':
+      return <TabSostenibilidad rdbData={rdbData} periodo={periodo} widgetFilter={key} />
+    case 'sr_hhi_graficos':
+    case 'sr_hhi_fuentes':
+    case 'sr_hhi_detalle':
+      return <RenderHHISostenedor sostId={sostId} periodo={periodo} widgetFilter={key} />
+    // ── Comportamiento Financiero ─────────────────────────────────────────────
+    case 'cf_gasto_rem':
+      return <GastoRemIngresoEstablecimiento sostId={sostId} periodo={periodo} />
+    case 'cf_analisis_rendicion':
+      return <AnalisisRendicion sostId={sostId} periodo={periodo} />
+    // ── Territorio ────────────────────────────────────────────────────────────
+    case 'te_complejidad_ive':
+    case 'te_complejidad_matricula':
+    case 'te_complejidad_prioridades':
+      return <RenderComplejidadEducativa data={territorioData} periodo={periodo} widgetFilter={key} />
+    case 'te_gasto_kpis':
+    case 'te_gasto_tabla':
+    case 'te_gasto_graficos':
+      return <RenderGastoEducativo sostId={sostId} periodo={periodo} widgetFilter={key} />
+    default:
+      return null
+  }
+}
+
+// ── Helpers para renderizar fragmentos específicos de widgets ─────────────────
+
+function RenderFinancieroWidget({ rdbData, periodo, widgetKey }) {
+  const C = useChartColors()
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
+  if (!rdbData) return null
+  const { financiero_rbd = [], remuneraciones_rbd = [] } = rdbData
+  const sorted = [...financiero_rbd].sort((a, b) => Number(b.ingreso) - Number(a.ingreso))
+  const visible = sorted.slice(0, 15)
+  const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(280, visible.length * 36)
+
+  if (widgetKey === 'ef_ingreso_gasto') {
+    const opt = {
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
+        formatter: params => { const d = visible[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>📈 ${fmtAmt(d.ingreso)}<br/>📉 ${fmtAmt(d.gasto)}` }
+      },
+      legend: { data: ['Ingreso', 'Gasto'], textStyle: { color: C.axisLabel }, top: 0 },
+      grid: { left: 260, right: 80, top: 40, bottom: 20 },
+      xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+      yAxis: { type: 'category', data: names, axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
+      series: [
+        { name: 'Ingreso', type: 'bar', data: visible.map(d => Number(d.ingreso)), barMaxWidth: 14, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } },
+        { name: 'Gasto', type: 'bar', data: visible.map(d => Number(d.gasto)), barMaxWidth: 14, itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } },
+      ],
+      backgroundColor: 'transparent',
+    }
+    return <ReactECharts option={opt} style={{ height: h }} />
+  }
+
+  if (widgetKey === 'ef_superavit') {
+    const opt = {
+      tooltip: {
+        trigger: 'axis', ...C.tooltip,
+        formatter: params => { const d = visible[params[0].dataIndex]; const v = Number(d.superavit); return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Superávit: <b>${fmtAmt(v)}</b>` }
+      },
+      grid: { left: 260, right: 80, top: 20, bottom: 20 },
+      xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+      yAxis: { type: 'category', data: names, axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
+      series: [{ type: 'bar', barMaxWidth: 14, data: visible.map(d => ({ value: Number(d.superavit), itemStyle: { color: Number(d.superavit) >= 0 ? '#10b981' : '#ef4444', borderRadius: [0, 4, 4, 0] } })) }],
+      backgroundColor: 'transparent',
+    }
+    return <ReactECharts option={opt} style={{ height: h }} />
+  }
+
+  if (widgetKey === 'ef_remuneraciones') {
+    const remTop = [...remuneraciones_rbd].sort((a, b) => Number(b.total_liquido) - Number(a.total_liquido)).slice(0, 15)
+    const opt = {
+      tooltip: {
+        trigger: 'axis', ...C.tooltip,
+        formatter: params => { const d = remTop[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Total líq.: ${fmtAmt(d.total_liquido)}` }
+      },
+      grid: { left: 260, right: 80, top: 20, bottom: 20 },
+      xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+      yAxis: { type: 'category', data: remTop.map(d => shortName(d.nom_rbd, d.rbd)), axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
+      series: [{ type: 'bar', barMaxWidth: 14, data: remTop.map(d => Number(d.total_liquido)), itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] } }],
+      backgroundColor: 'transparent',
+    }
+    return <ReactECharts option={opt} style={{ height: Math.max(280, remTop.length * 36) }} />
+  }
+
+  return null
+}
+
+function RenderInnovacionPedagogicaWidget({ rdbData, periodo, widgetKey }) {
+  const C = useChartColors()
+  if (!rdbData) return null
+  const { eficiencia_rbd = [] } = rdbData
+  const sorted = [...eficiencia_rbd].sort((a, b) => Number(b.total_gasto) - Number(a.total_gasto))
+  const visible = sorted.slice(0, 15)
+  const names = visible.map(d => shortName(d.nom_rbd, d.rbd))
+  const h = Math.max(280, visible.length * 36)
+
+  if (widgetKey === 'eg_distribucion_gasto') {
+    const opt = {
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
+        formatter: params => { const d = visible[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Aula: ${d.pct_aula}% | Admin: ${d.pct_admin}% | Otros: ${d.pct_otros}%` }
+      },
+      legend: { data: ['Gasto en Aula', 'Gasto Admin.', 'Otros'], textStyle: { color: C.axisLabel }, top: 0 },
+      grid: { left: 260, right: 80, top: 40, bottom: 20 },
+      xAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: v => `${v}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
+      yAxis: { type: 'category', data: names, axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
+      series: [
+        { name: 'Gasto en Aula', type: 'bar', stack: 'pct', barMaxWidth: 14, data: visible.map(d => d.pct_aula), itemStyle: { color: '#10b981' } },
+        { name: 'Gasto Admin.', type: 'bar', stack: 'pct', barMaxWidth: 14, data: visible.map(d => d.pct_admin), itemStyle: { color: '#ef4444' } },
+        { name: 'Otros', type: 'bar', stack: 'pct', barMaxWidth: 14, data: visible.map(d => d.pct_otros), itemStyle: { color: '#f59e0b' } },
+      ],
+      backgroundColor: 'transparent',
+    }
+    return <ReactECharts option={opt} style={{ height: h }} />
+  }
+
+  if (widgetKey === 'eg_nivel_admin') {
+    const opt = {
+      tooltip: {
+        trigger: 'axis', ...C.tooltip,
+        formatter: params => { const d = visible[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>% Admin: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}` }
+      },
+      grid: { left: 260, right: 80, top: 20, bottom: 20 },
+      xAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: v => `${v}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
+      yAxis: { type: 'category', data: names, axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
+      series: [{ type: 'bar', barMaxWidth: 14, data: visible.map(d => ({ value: d.pct_admin, itemStyle: { color: EF_COLORS[d.nivel_eficiencia] ?? '#64748b', borderRadius: [0, 4, 4, 0] } })) }],
+      backgroundColor: 'transparent',
+    }
+    return <ReactECharts option={opt} style={{ height: h }} />
+  }
+
+  return null
+}
+
+function TabTerritorioWidget({ data, periodo, sostId, widgetKey }) {
+  // Renderiza solo el fragmento relevante según la clave granular
+  if (!data) return <div style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Cargando datos de territorio…</div>
+  if (widgetKey.startsWith('te_complejidad')) {
+    return <RenderComplejidadEducativa data={data} periodo={periodo} widgetFilter={widgetKey} />
+  }
+  if (widgetKey.startsWith('te_gasto')) {
+    return <RenderGastoEducativo sostId={sostId} periodo={periodo} widgetFilter={widgetKey} />
+  }
+  return null
 }

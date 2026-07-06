@@ -2282,3 +2282,42 @@ async def sned_sostenedor(
             "total_ingreso":  total_ingreso,
         },
     }
+
+# ── Resumen Personalizado — Pins del Sostenedor ─────────────────────────────
+
+from pydantic import BaseModel as PydanticBase
+from typing import List as TypingList
+
+class PinsPayload(PydanticBase):
+    pins: TypingList[str]
+
+@router.get("/resumen-pins")
+async def get_resumen_pins(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna los pins del tab Resumen del usuario actual."""
+    result = await db.execute(
+        text("SELECT resumen_pins FROM app_users WHERE id = :uid"),
+        {"uid": current_user.id},
+    )
+    row = result.mappings().one_or_none()
+    pins = row["resumen_pins"] if row and row["resumen_pins"] is not None else []
+    return {"pins": pins}
+
+@router.put("/resumen-pins")
+async def save_resumen_pins(
+    payload: PinsPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Guarda (reemplaza) la lista de pins del tab Resumen del usuario actual."""
+    import json
+    await db.execute(
+        text(
+            "UPDATE app_users SET resumen_pins = :pins::jsonb WHERE id = :uid"
+        ),
+        {"pins": json.dumps(payload.pins), "uid": current_user.id},
+    )
+    await db.commit()
+    return {"ok": True, "pins": payload.pins}

@@ -4,6 +4,8 @@ import api from '../../lib/api'
 import { fmtMM, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 
+import SqlViewer from '../../components/SqlViewer'
+
 const MESES = [
   '', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
@@ -258,8 +260,55 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.8rem',
   })
 
+  const sqlStr = `-- 1. Resumen General
+SELECT 
+    COUNT(id) AS total_docs,
+    SUM(monto_declarado) AS total_monto,
+    COUNT(DISTINCT rbd) AS n_rbd,
+    ARRAY_AGG(DISTINCT periodo) AS anios_disponibles
+FROM documentos
+WHERE sost_id = :sid AND (:per IS NULL OR periodo = :per) AND (:mes IS NULL OR mes = :mes);
+
+-- 2. Serie Mensual
+SELECT mes, COUNT(id) AS n_docs, SUM(monto_declarado) AS total_monto
+FROM documentos
+WHERE sost_id = :sid AND periodo = :per
+GROUP BY mes ORDER BY mes;
+
+-- 3. Por Cuenta Padre
+SELECT COALESCE(desc_cuenta_padre, 'Sin Cuenta Padre') AS desc_cuenta_padre,
+       COUNT(id) AS n_docs, SUM(monto_declarado) AS total_monto
+FROM documentos
+WHERE sost_id = :sid AND periodo = :per AND (:mes IS NULL OR mes = :mes)
+GROUP BY desc_cuenta_padre ORDER BY total_monto DESC;
+
+-- 4. Por Subvención
+SELECT COALESCE(subvencion_alias, 'Sin Subvención') AS subvencion_alias,
+       COUNT(id) AS n_docs, SUM(monto_declarado) AS total_monto
+FROM documentos
+WHERE sost_id = :sid AND periodo = :per AND (:mes IS NULL OR mes = :mes)
+GROUP BY subvencion_alias ORDER BY total_monto DESC LIMIT 10;
+
+-- 5. Por Tipo de Documento
+SELECT COALESCE(tipo_docs_alias, 'Sin Tipo') AS tipo_docs_alias,
+       COUNT(id) AS n_docs, SUM(monto_declarado) AS total_monto
+FROM documentos
+WHERE sost_id = :sid AND periodo = :per AND (:mes IS NULL OR mes = :mes)
+GROUP BY tipo_docs_alias ORDER BY total_monto DESC LIMIT 10;
+
+-- 6. Detalle (paginado en el frontend)
+SELECT 
+    anio, mes, rbd, desc_libro, desc_cuenta_padre, desc_cuenta, 
+    subvencion_alias, tipo_docs_alias, 
+    COUNT(id) AS n_docs, SUM(monto_declarado) AS monto_declarado
+FROM documentos
+WHERE sost_id = :sid AND periodo = :per AND (:mes IS NULL OR mes = :mes)
+GROUP BY anio, mes, rbd, desc_libro, desc_cuenta_padre, desc_cuenta, subvencion_alias, tipo_docs_alias
+ORDER BY monto_declarado DESC`
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       {/* ── Alerta informativa ──────────────────────────────────────── */}
       <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>
         📋 <strong>Análisis Rendición {periodo}{mes ? ` · ${MESES_FULL[mes]}` : ''}</strong>

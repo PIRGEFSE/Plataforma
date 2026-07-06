@@ -44,6 +44,13 @@ const NAV_ITEMS = [
 // Estructura jerárquica de navegación para el rol sostenedor
 const SOSTENEDOR_NAV_GROUPS = [
   {
+    path: '/mi-ficha/resumen',
+    label: 'Resumen',
+    icon: '🗂️',
+    exact: true,
+    children: [],
+  },
+  {
     path: '/mi-ficha',
     label: 'Mi Ficha',
     icon: '🏛️',
@@ -293,6 +300,7 @@ export default function Dashboard() {
             {user?.role === 'sostenedor' && (
               <>
                 <Route path="/mi-ficha" element={<FichaSostenedor section="perfil" />} />
+                <Route path="/mi-ficha/resumen" element={<FichaSostenedor section="resumen" />} />
                 <Route path="/mi-ficha/educativo-financiero" element={<FichaSostenedor section="educativo_financiero" />} />
                 <Route path="/mi-ficha/eficiencia" element={<FichaSostenedor section="eficiencia" />} />
                 <Route path="/mi-ficha/sostenibilidad-riesgo" element={<FichaSostenedor section="sostenibilidad_riesgo" />} />
