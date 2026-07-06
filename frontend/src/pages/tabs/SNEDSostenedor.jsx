@@ -4,15 +4,16 @@ import api from '../../lib/api'
 import { fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useMoneyFmt } from './FichaSostenedor'
+import SqlViewer from '../../components/SqlViewer'
 
 // ── Descripción de indicadores SNED ───────────────────────────────────────
 const SNED_INDICADORES = [
-  { key: 'e',       label: 'E',   nombre: 'Efectividad',               desc: 'Resultado obtenido en pruebas SIMCE del año anterior a la medición', color: '#6366f1' },
-  { key: 's',       label: 'S',   nombre: 'Superación',                desc: 'Variación de puntajes SIMCE de los últimos años', color: '#10b981' },
-  { key: 'i',       label: 'I',   nombre: 'Iniciativa',                desc: 'Incorporación de innovaciones educativas', color: '#f59e0b' },
-  { key: 'm',       label: 'M',   nombre: 'Mejoramiento',              desc: 'Adecuado funcionamiento del establecimiento', color: '#8b5cf6' },
-  { key: 'ig',      label: 'IG',  nombre: 'Igualdad de Oportunidades', desc: 'Accesibilidad y permanencia de la población escolar', color: '#ec4899' },
-  { key: 'int_val', label: 'INT', nombre: 'Integración',               desc: 'Participación de profesores, padres y apoderados', color: '#14b8a6' },
+  { key: 'e', label: 'E', nombre: 'Efectividad', desc: 'Resultado obtenido en pruebas SIMCE del año anterior a la medición', color: '#6366f1' },
+  { key: 's', label: 'S', nombre: 'Superación', desc: 'Variación de puntajes SIMCE de los últimos años', color: '#10b981' },
+  { key: 'i', label: 'I', nombre: 'Iniciativa', desc: 'Incorporación de innovaciones educativas', color: '#f59e0b' },
+  { key: 'm', label: 'M', nombre: 'Mejoramiento', desc: 'Adecuado funcionamiento del establecimiento', color: '#8b5cf6' },
+  { key: 'ig', label: 'IG', nombre: 'Igualdad de Oportunidades', desc: 'Accesibilidad y permanencia de la población escolar', color: '#ec4899' },
+  { key: 'int_val', label: 'INT', nombre: 'Integración', desc: 'Participación de profesores, padres y apoderados', color: '#14b8a6' },
 ]
 
 function shortName(nom, rbd) {
@@ -24,8 +25,8 @@ function snedColor(ee) {
   if (!ee.seleccionado_sned) return '#64748b'
   const s = ee.seleccionado_sned.toLowerCase()
   if (s.includes('100%')) return '#10b981'
-  if (s.includes('60%'))  return '#f59e0b'
-  if (s.includes('40%'))  return '#fb923c'
+  if (s.includes('60%')) return '#f59e0b'
+  if (s.includes('40%')) return '#fb923c'
   if (s.includes('no') || s.includes('premiado')) return '#ef4444'
   return '#64748b'
 }
@@ -35,8 +36,8 @@ function snedBadge(estado) {
   const s = estado.toLowerCase()
   const col = s.includes('no') || !s.includes('premiado') ? '#ef4444'
     : s.includes('100%') ? '#10b981'
-    : s.includes('60%')  ? '#f59e0b'
-    : '#fb923c'
+      : s.includes('60%') ? '#f59e0b'
+        : '#fb923c'
   return (
     <span style={{
       fontSize: '0.72rem', fontWeight: 700, color: col,
@@ -62,10 +63,10 @@ function KPICard({ label, value, icon, color, sub }) {
 }
 
 export default function SNEDSostenedor({ sostId, periodo }) {
-  const [data, setData]       = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [page, setPage]       = useState(0)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
   const ITEMS = 10
   const C = useChartColors()
   const { fmtAmt, unitLabel } = useMoneyFmt()
@@ -81,10 +82,12 @@ export default function SNEDSostenedor({ sostId, periodo }) {
   useEffect(() => { setPage(0) }, [search, periodo])
 
   if (loading) return <div className="loading-area"><div className="spinner" /></div>
-  if (!data)   return <div style={{ color: 'var(--text-muted)', padding: '2rem' }}>Sin datos disponibles.</div>
+  if (!data) return <div style={{ color: 'var(--text-muted)', padding: '2rem' }}>Sin datos disponibles.</div>
 
   const { establecimientos: ees = [], kpis = {}, agno_sned, periodo_fin } = data
-  const agnoLabel = agno_sned === 2020 ? '2020–2021' : agno_sned === 2022 ? '2022–2023' : '2024–2025'
+  //const agnoLabel = agno_sned === 2020 ? '2020–2021' : agno_sned === 2022 ? '2022–2023' : '2024–2025'
+  const agnoLabel = agno_sned
+
 
   // ── Filtrado y paginación ─────────────────────────────────────────────────
   const ft = search.toLowerCase().trim()
@@ -100,10 +103,10 @@ export default function SNEDSostenedor({ sostId, periodo }) {
   const scatterData = ees
     .filter(d => d.ind_sned != null && d.ingreso != null)
     .map(d => ({
-      value:   [d.ind_sned, d.ingreso / 1e6],
-      name:    d.nom_rbd,
-      rbd:     d.rbd,
-      color:   snedColor(d),
+      value: [d.ind_sned, d.ingreso / 1e6],
+      name: d.nom_rbd,
+      rbd: d.rbd,
+      color: snedColor(d),
       premiado: d.premiado,
     }))
 
@@ -128,7 +131,7 @@ export default function SNEDSostenedor({ sostId, periodo }) {
     },
     yAxis: {
       type: 'value', name: `Ingreso (M$)`, nameLocation: 'middle', nameGap: 55,
-      axisLabel: { color: C.axisLabel, formatter: v => `${(v/1000).toFixed(0)} mM$` },
+      axisLabel: { color: C.axisLabel, formatter: v => `${(v / 1000).toFixed(0)} mM$` },
       splitLine: { lineStyle: { color: C.splitLine } },
     },
     series: [
@@ -186,10 +189,12 @@ export default function SNEDSostenedor({ sostId, periodo }) {
           value: d.posicion_gh ?? 0,
           itemStyle: { color: snedColor(d), borderRadius: [0, 4, 4, 0] },
         })),
-        label: { show: true, position: 'right', formatter: p => {
-          const d = posData[p.dataIndex]
-          return d ? `${d.posicion_gh}/${d.n_establecimientos_gh}` : ''
-        }, color: C.axisLabel, fontSize: 10 },
+        label: {
+          show: true, position: 'right', formatter: p => {
+            const d = posData[p.dataIndex]
+            return d ? `${d.posicion_gh}/${d.n_establecimientos_gh}` : ''
+          }, color: C.axisLabel, fontSize: 10
+        },
         z: 2,
       },
     ],
@@ -224,11 +229,11 @@ export default function SNEDSostenedor({ sostId, periodo }) {
         const hue = Math.round((idx / Math.max(eeConPuntaje.length, 1)) * 360)
         const col = `hsl(${hue},70%,60%)`
         return {
-          name:  shortName(d.nom_rbd, d.rbd),
+          name: shortName(d.nom_rbd, d.rbd),
           value: SNED_INDICADORES.map(ind => d[ind.key] ?? 0),
-          lineStyle:  { color: col, width: 1.5 },
-          areaStyle:  { color: col, opacity: 0.08 },
-          itemStyle:  { color: col },
+          lineStyle: { color: col, width: 1.5 },
+          areaStyle: { color: col, opacity: 0.08 },
+          itemStyle: { color: col },
           symbol: 'circle', symbolSize: 5,
         }
       }),
@@ -248,8 +253,35 @@ export default function SNEDSostenedor({ sostId, periodo }) {
     cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.8rem',
   })
 
+  const sqlStr = `-- 1. Ficha SNED (Información general)
+SELECT nro AS rbd, agno, grupo_homogeneo, posicion_gh,
+       n_establecimientos_gh, seleccionado_sned
+FROM "Ficha_SNED"
+WHERE nro = ANY(:rbds) AND agno = :agno
+ORDER BY nro;
+
+-- 2. Tabla SNED (Puntajes por indicador)
+SELECT nro_establecimiento AS rbd, agno, resultados_sned,
+       ind_sned, e, s, i, m, ig, int_val
+FROM "Tabla_SNED"
+WHERE nro_establecimiento = ANY(:rbds) AND agno = :agno
+ORDER BY nro_establecimiento, resultados_sned;
+
+-- 3. Financiero (Ingresos/Gastos)
+SELECT
+    rbd,
+    SUM(CASE WHEN desc_tipo_cuenta ILIKE '%ingreso%' THEN monto_declarado ELSE 0 END) AS ingreso,
+    SUM(CASE WHEN desc_tipo_cuenta ILIKE '%gasto%'   THEN monto_declarado ELSE 0 END) AS gasto
+FROM estado_resultado
+WHERE sost_id = :sid
+  AND periodo  = :p
+  AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+  AND rbd = ANY(:rbds)
+GROUP BY rbd;`
+
   return (
     <>
+      <SqlViewer sql={sqlStr} />
       {/* ── Banner informativo SNED ──────────────────────────────────────── */}
       <div style={{
         background: 'linear-gradient(135deg, #6366f110 0%, #8b5cf610 100%)',
@@ -260,11 +292,11 @@ export default function SNEDSostenedor({ sostId, periodo }) {
           <span style={{ fontSize: '1.25rem' }}>🏆</span>
           <div>
             <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-              Sistema Nacional de Evaluación del Desempeño (SNED) — Período {agnoLabel}
+              Sistema Nacional de Evaluación del Desempeño (SNED) — Año {periodo_fin}
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+            {/*<div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
               Datos financieros: {periodo_fin} · Los datos SNED se aplican en períodos bienales
-            </div>
+            </div>*/}
           </div>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
@@ -288,16 +320,16 @@ export default function SNEDSostenedor({ sostId, periodo }) {
 
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-        <KPICard icon="🏫" label="EE con datos SNED" value={fmtN(kpis.con_sned)}      color="#6366f1" sub={`de ${fmtN(kpis.total_ee)} totales`} />
-        <KPICard icon="🥇" label="EE Premiados SNED"  value={fmtN(kpis.premiados)}     color="#10b981" sub={`${kpis.con_sned > 0 ? Math.round(kpis.premiados/kpis.con_sned*100) : 0}% con subvención`} />
-        <KPICard icon="📈" label="EE sobre Prom. GH"  value={fmtN(kpis.sobre_prom_gh)} color="#f59e0b" sub="Puntaje SNED ≥ promedio GH" />
+        <KPICard icon="🏫" label="EE con datos SNED" value={fmtN(kpis.con_sned)} color="#6366f1" sub={`de ${fmtN(kpis.total_ee)} totales`} />
+        <KPICard icon="🥇" label="EE Premiados SNED" value={fmtN(kpis.premiados)} color="#10b981" sub={`${kpis.con_sned > 0 ? Math.round(kpis.premiados / kpis.con_sned * 100) : 0}% con subvención`} />
+        <KPICard icon="📈" label="EE sobre Prom. GH" value={fmtN(kpis.sobre_prom_gh)} color="#f59e0b" sub="Puntaje SNED ≥ promedio GH" />
         <KPICard icon="💰" label={`Ingreso Total (${periodo_fin})`} value={fmtAmt(kpis.total_ingreso)} color="#8b5cf6" sub={unitLabel} />
       </div>
 
       {/* ── Gráficos: Scatter + Posición GH ─────────────────────────────── */}
       <div className="charts-grid-2" style={{ marginBottom: '1.5rem' }}>
         <div className="chart-card">
-          <h3 className="chart-title">Puntaje SNED vs Ingreso — {agnoLabel}</h3>
+          <h3 className="chart-title">Puntaje SNED vs Ingreso — {periodo_fin}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
             <span style={{ color: '#10b981' }}>● Premiado</span>&nbsp;&nbsp;
             <span style={{ color: '#6366f1' }}>● No Premiado</span>
@@ -309,7 +341,7 @@ export default function SNEDSostenedor({ sostId, periodo }) {
         </div>
 
         <div className="chart-card">
-          <h3 className="chart-title">Posición en Grupo Homogéneo — {agnoLabel}</h3>
+          <h3 className="chart-title">Posición en Grupo Homogéneo — {periodo_fin}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
             <span style={{ color: '#334155' }}>■</span> Total GH &nbsp;
             <span style={{ color: '#10b981' }}>■</span> Premiado &nbsp;
@@ -324,7 +356,7 @@ export default function SNEDSostenedor({ sostId, periodo }) {
 
       {/* ── Radar: Todos los EE ──────────────────────────────────────────── */}
       <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">Radar de Indicadores SNED — Todos los Establecimientos ({agnoLabel})</h3>
+        <h3 className="chart-title">Radar de Indicadores SNED — Todos los Establecimientos ({periodo_fin})</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
           Comparación de los 6 indicadores por establecimiento. Escala 0–100.
         </p>
@@ -339,7 +371,7 @@ export default function SNEDSostenedor({ sostId, periodo }) {
         {/* Header tabla */}
         <div style={{ padding: '1rem 1.25rem 0.75rem', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h3 className="chart-title" style={{ margin: 0 }}>
-            Detalle por Establecimiento — SNED {agnoLabel} / Financiero {periodo_fin}
+            Detalle por Establecimiento — Año {periodo_fin}
           </h3>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input type="text" placeholder="🔍 Buscar..." value={search}

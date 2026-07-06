@@ -1,0 +1,28 @@
+# Excluir archivos que no deben estar en la imagen Docker de producción
+
+# Variables de entorno locales — en producción las inyecta docker-compose
+.env
+.env.*
+!.env.example
+
+# Entorno virtual Python — la imagen instala sus propias dependencias
+.venv/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de desarrollo
+*.log
+scratch.py
+test_query.py
+extract_sned.py
+load_sned_tables.py
+mv_def.sql
+mv_def2.txt
+
+# Git
+.git/
+.gitignore
