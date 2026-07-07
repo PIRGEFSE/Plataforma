@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   { path: '/remuneraciones', label: 'Remuneraciones', icon: '💰', roles: ['admin'] },
   { path: '/estado-resultado', label: 'Estado Resultado', icon: '📋', roles: ['admin'] },
   { path: '/usuarios', label: 'Usuarios', icon: '👥', roles: ['admin'] },
-  { path: '/mi-ficha', label: 'Mi Ficha', icon: '🏛️', roles: ['sostenedor'] },
+  { path: '/mi-ficha', label: 'Mis Establecimientos', icon: '🏛️', roles: ['sostenedor'] },
   { path: '/mi-ficha/educativo-financiero', label: 'Educativo - Financiero', icon: '📊', roles: ['sostenedor'] },
   { path: '/mi-ficha/eficiencia', label: 'Eficiencia del Gasto', icon: '⚙️', roles: ['sostenedor'] },
   { path: '/mi-ficha/sostenibilidad-riesgo', label: 'Sostenibilidad y Riesgo', icon: '🛡️', roles: ['sostenedor'] },
@@ -52,7 +52,7 @@ const SOSTENEDOR_NAV_GROUPS = [
   },
   {
     path: '/mi-ficha',
-    label: 'Mi Ficha',
+    label: 'Mis Establecimientos',
     icon: '🏛️',
     exact: true,
     children: [],
@@ -63,6 +63,7 @@ const SOSTENEDOR_NAV_GROUPS = [
     icon: '📊',
     children: [
       { label: 'Ingreso - Gasto', icon: '💵', lsKey: 'pirgefse-fichasost-educativo-financiero', lsVal: 'ingreso_gasto' },
+      { label: 'SNED',            icon: '🏆', lsKey: 'pirgefse-fichasost-educativo-financiero', lsVal: 'sned' },
     ],
   },
   {
@@ -125,7 +126,11 @@ function NavGroup({ group, sidebarOpen, navigate, isActive, currentPath }) {
   }, [expanded, storageKey])
 
   const handleGroupClick = () => {
-    if (hasChildren && sidebarOpen) setExpanded(e => !e)
+    if (isActive) {
+      if (hasChildren && sidebarOpen) setExpanded(e => !e)
+    } else {
+      if (hasChildren && sidebarOpen) setExpanded(true)
+    }
     navigate(group.path)
   }
 

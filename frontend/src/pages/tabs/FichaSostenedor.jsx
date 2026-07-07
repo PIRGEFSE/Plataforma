@@ -14,7 +14,6 @@ export const SOSTENEDOR_WIDGETS = [
   // Educativo - Financiero
   { key: 'ef_ingreso_gasto', label: 'Ingreso vs Gasto por EE', section: 'educativo_financiero', icon: '💵', color: '#10b981', grupo: 'Educativo - Financiero' },
   { key: 'ef_superavit', label: 'Superávit / Déficit por EE', section: 'educativo_financiero', icon: '⚖️', color: '#6366f1', grupo: 'Educativo - Financiero' },
-  { key: 'ef_remuneraciones', label: 'Remuneraciones Top 15', section: 'educativo_financiero', icon: '💰', color: '#f59e0b', grupo: 'Educativo - Financiero' },
   { key: 'ef_sned', label: 'Análisis SNED', section: 'educativo_financiero', icon: '🏆', color: '#8b5cf6', grupo: 'Educativo - Financiero' },
   // Eficiencia del Gasto
   { key: 'eg_distribucion_gasto', label: 'Distribución del Gasto (%)', section: 'eficiencia', icon: '📊', color: '#3b82f6', grupo: 'Eficiencia del Gasto' },
@@ -39,9 +38,8 @@ export const SOSTENEDOR_WIDGETS = [
   { key: 'cf_gasto_rem', label: 'Gastos Rem. sobre Ingreso Dep.', section: 'comportamiento_financiero', icon: '📉', color: '#f59e0b', grupo: 'Comportamiento Financiero' },
   { key: 'cf_analisis_rendicion', label: 'Análisis Rendición', section: 'comportamiento_financiero', icon: '📋', color: '#6366f1', grupo: 'Comportamiento Financiero' },
   // Territorio — Complejidad Educativa
-  { key: 'te_complejidad_ive', label: 'Complejidad — Top IVE por EE', section: 'territorio', icon: '🧩', color: '#10b981', grupo: 'Territorio' },
-  { key: 'te_complejidad_matricula', label: 'Complejidad — Matrícula y Comunas', section: 'territorio', icon: '🏫', color: '#6366f1', grupo: 'Territorio' },
   { key: 'te_complejidad_prioridades', label: 'Complejidad — Distribución Prioridades', section: 'territorio', icon: '📊', color: '#f59e0b', grupo: 'Territorio' },
+  { key: 'te_complejidad_scatter', label: 'Complejidad — IVE vs Ingreso', section: 'territorio', icon: '🔵', color: '#3b82f6', grupo: 'Territorio' },
   // Territorio — Gasto Educativo
   { key: 'te_gasto_kpis', label: 'Gasto Educativo — KPIs', section: 'territorio', icon: '💰', color: '#22d3ee', grupo: 'Territorio' },
   { key: 'te_gasto_tabla', label: 'Gasto Educativo — Tabla por Centro', section: 'territorio', icon: '📋', color: '#ec4899', grupo: 'Territorio' },
@@ -274,7 +272,7 @@ export const MoneyFmtCtx = createContext({ fmtAmt: fmtMM, fmtAxisAmt: fmtMonedaC
 export const useMoneyFmt = () => useContext(MoneyFmtCtx)
 
 const SECTION_TITLES = {
-  perfil: { icon: '🏛️', label: 'Mi Ficha' },
+  perfil: { icon: '🏛️', label: 'Mis Establecimientos' },
   financiero: { icon: '💵', label: 'Financiero — Comparación por Establecimiento' },
   educativo_financiero: { icon: '📊', label: 'Educativo — Financiero por Establecimiento' },
   eficiencia: { icon: '⚙️', label: 'Eficiencia del Gasto — por Establecimiento' },
@@ -781,26 +779,6 @@ function TabFinanciero({ rdbData, periodo }) {
     backgroundColor: 'transparent',
   }
 
-  const remTop = [...remuneraciones_rbd].sort((a, b) => Number(b.total_liquido) - Number(a.total_liquido)).slice(0, 15)
-  const remOption = {
-    tooltip: {
-      trigger: 'axis', ...C.tooltip,
-      formatter: params => {
-        const d = remTop[params[0].dataIndex]
-        return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Total líq.: ${fmtAmt(d.total_liquido)}<br/>Prom.: $${fmtN(d.promedio_liquido)}`
-      }
-    },
-    grid: { left: 260, right: 100, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: remTop.map(d => shortName(d.nom_rbd, d.rbd)), axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
-    series: [{
-      type: 'bar', barMaxWidth: 16, data: remTop.map(d => Number(d.total_liquido)),
-      itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] },
-      label: { show: true, position: 'right', formatter: p => fmtAmt(p.value), fontSize: 9, color: '#fde68a' },
-    }],
-    backgroundColor: 'transparent',
-  }
-
   const totalIng = sorted.reduce((s, d) => s + Number(d.ingreso), 0)
   const totalGas = sorted.reduce((s, d) => s + Number(d.gasto), 0)
   const conDeficit = sorted.filter(d => Number(d.superavit) < 0).length
@@ -837,6 +815,9 @@ ORDER BY ingreso DESC`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Comparación entre el Ingreso Total y el Gasto Total por Establecimiento (RBD) para calcular el Superávit o Déficit del período.
+      </div>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📈" label={`Total Ingresos (${periodo})`} value={fmtAmt(totalIng)} color="#10b981" />
         <KPICard icon="📉" label={`Total Gastos (${periodo})`} value={fmtAmt(totalGas)} color="#ef4444" />
@@ -917,12 +898,6 @@ ORDER BY ingreso DESC`
             ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin resultados para «{search}»</p>
             : <ReactECharts option={superavitOption} style={{ height: h }} />
           }
-        </div>
-      </WidgetWrapper>
-      <WidgetWrapper widgetKey="ef_remuneraciones">
-        <div className="chart-card">
-          <h3 className="chart-title">Top 15 — Remuneraciones Líquidas por Establecimiento — {periodo} ({unitLabel})</h3>
-          <ReactECharts option={remOption} style={{ height: 440 }} />
         </div>
       </WidgetWrapper>
     </>
@@ -1099,6 +1074,9 @@ ORDER BY total_gasto DESC`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Proporción del gasto distribuido categóricamente entre Aula, Administración y Otros ítems respecto al Gasto Total.
+      </div>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📊" label="Prom. Gasto Admin" value={`${prom.toFixed(1)}%`} color={prom <= 15 ? '#10b981' : prom <= 25 ? '#f59e0b' : '#ef4444'} />
         <KPICard icon="🟢" label="EE Óptimos (≤15%)" value={fmtN(optim)} color="#10b981" />
@@ -1321,6 +1299,9 @@ ORDER BY costo_por_alumno DESC NULLS LAST`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Costo por Alumno = Gasto Total / Matrícula Total del establecimiento para el período seleccionado.
+      </div>
       <WidgetWrapper widgetKey="eg_costo_alumno_kpis">
         <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
           <KPICard icon="🎓" label="Costo Prom. Alumno" value={fmtAmt(resumen.costo_promedio_general)} color="#3b82f6" sub="Nivel Sostenedor" />
@@ -1589,6 +1570,9 @@ ORDER BY total DESC LIMIT 10;`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Nivel de Gasto Administrativo = (Gasto en cuentas de Administración / Gasto Total) × 100.
+      </div>
       <WidgetWrapper widgetKey="eg_gasto_adm_kpis">
         <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
           <KPICard icon="💼" label="Gasto Total Remuneracional" value={fmtAmt(resumen.total_gasto)} color="#8b5cf6" />
@@ -1794,6 +1778,9 @@ ORDER BY total_liquido DESC`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Análisis de la sostenibilidad financiera evaluando la proporción del Gasto en Remuneraciones frente a los Ingresos.
+      </div>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="📊" label="Ratio Prom. Rem/Ingreso" value={`${promRatio.toFixed(1)}%`} color={promRatio > 70 ? '#ef4444' : promRatio > 50 ? '#f59e0b' : '#10b981'} />
         <KPICard icon="✅" label="EE Saludables (<50%)" value={fmtN(saludables)} color="#10b981" />
@@ -1987,6 +1974,9 @@ ORDER BY pct_rendido ASC NULLS LAST`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Porcentaje de Acreditación = (Monto Rendido / Monto Total Declarado) × 100.
+      </div>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard icon="✅" label="EE Riesgo Bajo" value={fmtN(bajos)} color="#10b981" sub="≥90% rendido" />
         <KPICard icon="🟡" label="EE Riesgo Moderado" value={fmtN(moderados)} color="#f59e0b" sub="70–90% rendido" />
@@ -2379,6 +2369,9 @@ ORDER BY monto_total DESC;`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> HHI (Índice Herfindahl-Hirschman) = Sumatoria de los cuadrados de la participación porcentual de cada subvención. Un índice menor a 1.500 indica diversificación saludable.
+      </div>
 
       {/* Nota metodológica */}
       <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
@@ -2562,11 +2555,22 @@ function TabTerritorio({ data, periodo, sostId }) {
 
 function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
   const C = useChartColors()
+  const { fmtAmt, fmtAxisAmt } = useMoneyFmt()
   const [search, setSearch] = useState('')
   const [nivelFilter, setNivelFilter] = useState('all')
   const [ruralFilter, setRuralFilter] = useState('all')
   const [page, setPage] = useState(1)
   const ITEMS_PER_PAGE = 10
+  const [expandedKeys, setExpandedKeys] = useState(new Set())
+
+  const toggleExpand = (k) => {
+    setExpandedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
+  }
 
   useEffect(() => { setPage(1) }, [search, nivelFilter, ruralFilter, data, periodo])
 
@@ -2577,7 +2581,43 @@ function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
     </div>
   )
 
-  const { ive_establecimientos = [], nivel_resumen = [], por_comuna = [], prioridades = {} } = data
+  const { ive_establecimientos = [], nivel_resumen = [], por_comuna = [], prioridades = {}, financiero_por_rbd = [] } = data
+
+  // Mapa rbd → datos financieros agregados y jerárquicos
+  const finMapRaw = {}
+  for (const f of financiero_por_rbd) {
+    const k = f.rbd
+    if (!finMapRaw[k]) {
+      finMapRaw[k] = {
+        ingreso: 0, gasto: 0,
+        tipos: {
+          'INGRESO': { total: 0, subvs: {} },
+          'GASTO': { total: 0, subvs: {} }
+        }
+      }
+    }
+
+    finMapRaw[k].ingreso += f.ingreso ?? 0
+    finMapRaw[k].gasto += f.gasto ?? 0
+
+    const isIngreso = (f.desc_tipo_cuenta || '').toUpperCase().includes('INGRESO')
+    const tKey = isIngreso ? 'INGRESO' : 'GASTO'
+    const monto = f.monto_declarado ?? (isIngreso ? (f.ingreso ?? 0) : (f.gasto ?? 0))
+    const subv = f.subvencion_alias || 'Sin Subvención'
+    const cuenta = f.desc_cuenta_padre || 'Sin Cuenta'
+
+    if (monto !== 0) {
+      const tNode = finMapRaw[k].tipos[tKey]
+      tNode.total += monto
+
+      if (!tNode.subvs[subv]) tNode.subvs[subv] = { total: 0, cuentas: {} }
+      tNode.subvs[subv].total += monto
+
+      if (!tNode.subvs[subv].cuentas[cuenta]) tNode.subvs[subv].cuentas[cuenta] = 0
+      tNode.subvs[subv].cuentas[cuenta] += monto
+    }
+  }
+  const finMap = finMapRaw
 
   const filterText = search.toLowerCase().trim()
   const filtered = ive_establecimientos.filter(ee => {
@@ -2596,51 +2636,11 @@ function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
   const iveColor = (v) => v >= 0.9 ? '#ef4444' : v >= 0.7 ? '#f59e0b' : '#10b981'
   const iveLabel = (v) => v >= 0.9 ? 'Alto' : v >= 0.7 ? 'Medio' : 'Bajo'
   // ttStyle removed }
-  const NIV_CLR = { BASICA: '#60a5fa', MEDIA: '#34d399' }
 
   const prom_ive = data.ive_promedio ?? 0
   const total_ee = data.total_establecimientos ?? 0
   const total_mat = data.total_matricula ?? 0
   const altoVuln = ive_establecimientos.filter(e => (e.ive_sinae ?? 0) >= 0.9).length
-
-  const chartData = [...filtered].sort((a, b) => (b.ive_sinae ?? 0) - (a.ive_sinae ?? 0)).slice(0, 10)
-
-  const iveBarOption = {
-    tooltip: {
-      trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
-      formatter: params => {
-        const d = chartData[params[0].dataIndex]
-        return `<b>${d.nom_establecimiento}</b> (${d.rbd})<br/>IVE: <b style="color:${iveColor(d.ive_sinae)}">${(d.ive_sinae * 100).toFixed(1)}%</b> — ${iveLabel(d.ive_sinae)}<br/>Nivel: ${d.nivel}<br/>Matrícula: ${fmtN(d.total_matricula)}`
-      }
-    },
-    grid: { left: 270, right: 100, top: 20, bottom: 20 },
-    xAxis: { type: 'value', max: 1, axisLabel: { color: C.axisLabel, formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: chartData.map(d => d.nom_establecimiento.length > 36 ? d.nom_establecimiento.slice(0, 34) + '…' : d.nom_establecimiento), axisLabel: { color: C.axisLabel, fontSize: 10, width: 260, overflow: 'truncate' } },
-    series: [{
-      type: 'bar', barMaxWidth: 18,
-      data: chartData.map(d => ({ value: d.ive_sinae, itemStyle: { color: iveColor(d.ive_sinae), borderRadius: [0, 4, 4, 0] } })),
-      label: { show: true, position: 'right', formatter: p => `${(p.value * 100).toFixed(1)}%`, fontSize: 10, color: 'var(--text-primary)' },
-      markLine: { silent: true, data: [{ xAxis: 0.7, lineStyle: { color: '#f59e0b', type: 'dashed' }, label: { formatter: '70%', color: '#f59e0b', fontSize: 9 } }, { xAxis: 0.9, lineStyle: { color: '#ef4444', type: 'dashed' }, label: { formatter: '90%', color: '#ef4444', fontSize: 9 } }] }
-    }],
-    backgroundColor: 'transparent',
-  }
-
-  const donaOption = {
-    tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Matrícula: ${fmtN(p.value)}<br/>${p.percent.toFixed(1)}%` },
-    legend: { orient: 'vertical', left: '60%', top: 'center', textStyle: { color: C.axisLabel, fontSize: 11 } },
-    series: [{ type: 'pie', radius: ['45%', '70%'], center: ['30%', '50%'], data: nivel_resumen.map(n => ({ name: n.nivel, value: n.total_matricula, itemStyle: { color: NIV_CLR[n.nivel] ?? 'var(--text-muted)' } })), label: { show: false }, emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' } } }],
-    backgroundColor: 'transparent',
-  }
-
-  const comunasChart = [...por_comuna].slice(0, 15)
-  const comunaOption = {
-    tooltip: { trigger: 'axis', ...C.tooltip, formatter: params => { const d = comunasChart[params[0].dataIndex]; return `<b>${d.nom_comuna}</b><br/>IVE prom: <b>${(d.ive_promedio * 100).toFixed(1)}%</b><br/>EE: ${d.n_establecimientos} · Mat: ${fmtN(d.total_matricula)}` } },
-    grid: { left: 140, right: 80, top: 10, bottom: 20 },
-    xAxis: { type: 'value', max: 1, axisLabel: { color: C.axisLabel, formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: comunasChart.map(d => d.nom_comuna), axisLabel: { color: C.axisLabel, fontSize: 10, width: 130, overflow: 'truncate' } },
-    series: [{ type: 'bar', barMaxWidth: 18, data: comunasChart.map(d => ({ value: d.ive_promedio, itemStyle: { color: iveColor(d.ive_promedio), borderRadius: [0, 4, 4, 0] } })), label: { show: true, position: 'right', formatter: p => `${(p.value * 100).toFixed(1)}%`, fontSize: 10, color: 'var(--text-primary)' } }],
-    backgroundColor: 'transparent',
-  }
 
   const prioData = [
     { name: '1ª Prioridad', value: prioridades.primera ?? 0, color: '#ef4444' },
@@ -2656,6 +2656,35 @@ function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
     xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtN(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     yAxis: { type: 'category', data: ['Consolidado'], axisLabel: { color: C.axisLabel, fontSize: 11 } },
     series: prioData.map(d => ({ name: d.name, type: 'bar', stack: 'prio', barMaxWidth: 40, data: [d.value], itemStyle: { color: d.color }, label: { show: d.value > 0, position: 'inside', formatter: p => fmtN(p.value), fontSize: 10, color: '#fff', fontWeight: 600 } })),
+    backgroundColor: 'transparent',
+  }
+
+  // ── Nuevos gráficos IVE × Financiero ──────────────────────────────────────
+  // Solo establecimientos con IVE y datos financieros disponibles
+  const iveFinData = ive_establecimientos
+    .filter(e => e.ive_sinae != null && finMap[e.rbd])
+    .map(e => ({ ...e, ingreso: finMap[e.rbd]?.ingreso ?? 0, gasto: finMap[e.rbd]?.gasto ?? 0 }))
+
+  const scatterIveFinOption = {
+    tooltip: {
+      trigger: 'item', ...C.tooltip,
+      formatter: p => {
+        const d = p.data
+        return `<b>${d[3]}</b> (${d[4]})<br/>IVE: <b style="color:${iveColor(d[0])}">${(d[0] * 100).toFixed(1)}%</b><br/>Ingreso: <b style="color:#10b981">${fmtAmt(d[1])}</b><br/>Gasto: <b style="color:#ef4444">${fmtAmt(d[2])}</b><br/>Nivel: ${d[5]}`
+      }
+    },
+    legend: { data: ['BASICA', 'MEDIA'], textStyle: { color: C.axisLabel, fontSize: 10 }, top: 0 },
+    grid: { left: 70, right: 20, top: 40, bottom: 50 },
+    xAxis: { type: 'value', name: 'IVE SINAE', nameLocation: 'middle', nameGap: 30, min: 0, max: 1, axisLabel: { color: C.axisLabel, formatter: v => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'value', name: 'Ingreso', nameLocation: 'middle', nameGap: 60, axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: ['BASICA', 'MEDIA'].map(nv => ({
+      name: nv,
+      type: 'scatter',
+      symbolSize: d => Math.max(8, Math.min(28, Math.sqrt((d[6] ?? 100) / 4))),
+      data: iveFinData.filter(e => e.nivel === nv).map(e => [e.ive_sinae, e.ingreso, e.gasto, e.nom_establecimiento, e.rbd, e.nivel, e.total_matricula ?? 100]),
+      itemStyle: { color: nv === 'BASICA' ? '#60a5fa' : '#34d399', opacity: 0.75 },
+      emphasis: { scale: 1.4 }
+    })),
     backgroundColor: 'transparent',
   }
 
@@ -2677,53 +2706,41 @@ function RenderComplejidadEducativa({ data, periodo, widgetFilter = null }) {
     ROUND(CAST(ive.ive_sinae AS NUMERIC), 4) AS ive_sinae,
     eo.rural_rbd,
     eo.convenio_pie,
-    eo.pace
+    eo.pace,
+    fin.ingreso,
+    fin.gasto,
+    fin.desc_tipo_cuenta,
+    fin.subvencion_alias,
+    fin.cuenta_alias_padre,
+    fin.desc_cuenta_padre
 FROM dim_ive ive
 JOIN dim_establecimiento_oficial eo ON eo.rbd = ive.rbd AND eo.agno = ive.periodo
+LEFT JOIN (
+    SELECT
+        er.rbd,
+        er.cuenta_alias_padre,
+        er.desc_cuenta_padre,
+        er.desc_tipo_cuenta,
+        er.subvencion_alias,
+        SUM(er.monto_declarado) AS monto_declarado,
+        SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+                 THEN er.monto_declarado ELSE 0 END) AS ingreso,
+        SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+                 THEN er.monto_declarado ELSE 0 END) AS gasto
+    FROM estado_resultado er
+    WHERE er.sost_id = :sid
+      AND er.periodo  = :agno
+      AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+      AND er.monto_declarado <> 0
+    GROUP BY
+        er.rbd, er.cuenta_alias_padre, er.desc_cuenta_padre,
+        er.desc_tipo_cuenta, er.subvencion_alias
+) fin ON fin.rbd = ive.rbd
 WHERE eo.rut_sostenedor = :sid
   AND ive.periodo = :agno
 ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
 
   // ── Early return para el tab Resumen (solo fragmento específico) ─────────────
-  if (widgetFilter === 'te_complejidad_ive') {
-    return (
-      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">Top IVE por Establecimiento — {periodo}</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-          <span style={{ color: '#ef4444' }}>■</span> Alto ≥90% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Medio 70–90% &nbsp;<span style={{ color: '#10b981' }}>■</span> Bajo &lt;70%
-        </p>
-        {chartData.length === 0
-          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos para mostrar.</p>
-          : <ReactECharts option={iveBarOption} style={{ height: Math.max(280, chartData.length * 38) }} />
-        }
-      </div>
-    )
-  }
-  if (widgetFilter === 'te_complejidad_matricula') {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-        <div className="chart-card">
-          <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
-          <ReactECharts option={donaOption} style={{ height: 220 }} />
-          <div style={{ marginTop: '0.5rem' }}>
-            {nivel_resumen.map(n => (
-              <div key={n.nivel} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.8rem' }}>
-                <span style={{ color: NIV_CLR[n.nivel] ?? 'var(--text-muted)', fontWeight: 600 }}>{n.nivel}</span>
-                <span style={{ color: C.axisLabel }}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat.</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="chart-card">
-          <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
-          {comunasChart.length === 0
-            ? <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Sin datos.</p>
-            : <ReactECharts option={comunaOption} style={{ height: Math.max(220, comunasChart.length * 26) }} />
-          }
-        </div>
-      </div>
-    )
-  }
   if (widgetFilter === 'te_complejidad_prioridades') {
     return (
       <div className="chart-card">
@@ -2741,17 +2758,30 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
       </div>
     )
   }
+  if (widgetFilter === 'te_complejidad_scatter') {
+    return (
+      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+        <h3 className="chart-title">IVE vs Ingreso por Establecimiento — {periodo}</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+          Relación entre vulnerabilidad educativa (IVE SINAE) e ingresos rendidos. Tamaño proporcional a matrícula.
+          <span style={{ marginLeft: 12, color: '#60a5fa' }}>● Básica</span>
+          <span style={{ marginLeft: 8, color: '#34d399' }}>● Media</span>
+        </p>
+        {iveFinData.length === 0
+          ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos financieros cruzados para este período.</p>
+          : <ReactECharts option={scatterIveFinOption} style={{ height: Math.max(320, iveFinData.length * 6 + 100) }} />
+        }
+      </div>
+    )
+  }
 
   return (
     <>
       <SqlViewer sql={sqlStr} />
 
       {/* Nota metodológica */}
-      <div style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--line-subtle)' }}>
-        ℹ️ <strong>Metodología Complejidad Educativa:</strong> HHI = Σ(pct_i²) en escala 0-10.000.
-        <span style={{ marginLeft: 12 }}>🟢 &lt;1.500 Concentración Baja</span>
-        <span style={{ marginLeft: 10 }}>🟡 1.500-2.500 Moderada</span>
-        <span style={{ marginLeft: 10 }}>🔴 &gt;2.500 Alta — alta vulnerabilidad financiera</span>
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Análisis de vulnerabilidad basado en el Índice de Vulnerabilidad Escolar (IVE), concentración de estudiantes prioritarios y matrícula total.
       </div>
 
       {/* Indicadores */}
@@ -2762,6 +2792,37 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
         <KPICard icon="🔴" label="IVE Alto (≥90%)" value={fmtN(altoVuln)} color="#ef4444" sub="establecimientos" />
         <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(total_mat)} color="#10b981" />
       </div>
+
+      <WidgetWrapper widgetKey="te_complejidad_prioridades">
+        <div className="chart-card">
+          <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
+          <ReactECharts option={prioOption} style={{ height: 100 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginTop: '1rem' }}>
+            {prioData.map(p => (
+              <div key={p.name} style={{ textAlign: 'center', background: 'var(--surface-overlay)', borderRadius: '0.5rem', padding: '0.6rem', border: '1px solid var(--line-subtle)' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: p.color }}>{fmtN(p.value)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{p.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </WidgetWrapper>
+
+      <WidgetWrapper widgetKey="te_complejidad_scatter">
+        <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="chart-title">IVE vs Ingreso por Establecimiento — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            Relación entre vulnerabilidad educativa (IVE SINAE) e ingresos rendidos. El tamaño del punto es proporcional a la matrícula.
+            <span style={{ marginLeft: 12, color: '#60a5fa' }}>● Básica</span>
+            <span style={{ marginLeft: 8, color: '#34d399' }}>● Media</span>
+          </p>
+          {iveFinData.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos financieros cruzados para este período.</p>
+            : <ReactECharts option={scatterIveFinOption} style={{ height: Math.max(320, iveFinData.length * 6 + 100) }} />
+          }
+        </div>
+      </WidgetWrapper>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <input type="text" placeholder="🔍 Buscar por nombre de establecimiento..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inpSt, minWidth: 240 }} />
@@ -2794,20 +2855,31 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre', a: 'left' }, { h: 'Nivel', a: 'center' }, { h: 'IVE', a: 'center' }, { h: '1ª Prior.', a: 'right' }, { h: '2ª Prior.', a: 'right' }, { h: '3ª Prior.', a: 'right' }, { h: 'No Prior.', a: 'right' }, { h: 'Total Mat.', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }].map(({ h, a }) => (
+                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre', a: 'left' }, { h: 'Nivel', a: 'center' }, { h: 'IVE', a: 'center' }, { h: '1ª Prior.', a: 'right' }, { h: '2ª Prior.', a: 'right' }, { h: '3ª Prior.', a: 'right' }, { h: 'No Prior.', a: 'right' }, { h: 'Total Mat.', a: 'right' }, { h: 'Ingresos', a: 'right' }, { h: 'Gastos', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }].map(({ h, a }) => (
                   <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 && <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+              {paginated.length === 0 && <tr><td colSpan={13} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
               {paginated.map((ee, i) => {
                 const ive = ee.ive_sinae ?? 0
                 const clr = iveColor(ive)
-                return (
-                  <tr key={`${ee.rbd}-${ee.nivel}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                const fData = finMap[ee.rbd]
+                const hasFin = !!fData
+                const isExpandedRbd = expandedKeys.has(ee.rbd)
+
+                const rows = [
+                  <tr key={`${ee.rbd}-main`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
                     <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd}</td>
-                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span title={ee.nom_establecimiento}>{ee.nom_establecimiento}</span></td>
+                    <td style={{ padding: '0.45rem 0.8rem', color: 'var(--text-primary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {hasFin ? (
+                        <button onClick={() => toggleExpand(ee.rbd)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: 0, marginRight: '0.4rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                          {isExpandedRbd ? '▼' : '▶'}
+                        </button>
+                      ) : <span style={{ display: 'inline-block', width: '1.2rem' }}></span>}
+                      <span title={ee.nom_establecimiento}>{ee.nom_establecimiento}</span>
+                    </td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 600, color: ee.nivel === 'MEDIA' ? '#34d399' : '#60a5fa', background: ee.nivel === 'MEDIA' ? '#34d39922' : '#60a5fa22', borderRadius: 999, padding: '0.15rem 0.5rem', border: `1px solid ${ee.nivel === 'MEDIA' ? '#34d399' : '#60a5fa'}` }}>{ee.nivel}</span>
                     </td>
@@ -2819,10 +2891,69 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#facc15', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.tercera_prioridad)}</td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.no_priorizado)}</td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.total_matricula)}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fData ? fmtAmt(fData.ingreso) : '—'}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#ef4444', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fData ? fmtAmt(fData.gasto) : '—'}</td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : '·'}</td>
                     <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_comuna}</td>
                   </tr>
-                )
+                ]
+
+                if (hasFin && isExpandedRbd) {
+                  ['INGRESO', 'GASTO'].forEach(tKey => {
+                    const tNode = fData.tipos[tKey]
+                    if (tNode.total !== 0) {
+                      const tId = `${ee.rbd}-${tKey}`
+                      const isExpT = expandedKeys.has(tId)
+                      rows.push(
+                        <tr key={tId} style={{ background: i % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'var(--surface-overlay)', borderBottom: '1px solid var(--line-subtle)' }}>
+                          <td></td>
+                          <td colSpan={8} style={{ padding: '0.35rem 0.8rem', paddingLeft: '1.8rem', color: tKey === 'INGRESO' ? '#10b981' : '#ef4444', fontWeight: 600, fontSize: '0.78rem' }}>
+                            <button onClick={() => toggleExpand(tId)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginRight: '0.4rem', fontSize: '0.75rem' }}>{isExpT ? '▼' : '▶'}</button>
+                            {tKey === 'INGRESO' ? 'Ingresos' : 'Gastos'}
+                          </td>
+                          <td style={{ padding: '0.35rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{tKey === 'INGRESO' ? fmtAmt(tNode.total) : ''}</td>
+                          <td style={{ padding: '0.35rem 0.8rem', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{tKey === 'GASTO' ? fmtAmt(tNode.total) : ''}</td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      )
+                      if (isExpT) {
+                        Object.entries(tNode.subvs).forEach(([subv, sNode]) => {
+                          const sId = `${tId}-${subv}`
+                          const isExpS = expandedKeys.has(sId)
+                          rows.push(
+                            <tr key={sId} style={{ background: i % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'var(--surface-overlay)', borderBottom: '1px dashed var(--line-subtle)' }}>
+                              <td></td>
+                              <td colSpan={8} style={{ padding: '0.25rem 0.8rem', paddingLeft: '3.2rem', color: 'var(--text-primary)', fontSize: '0.75rem' }}>
+                                <button onClick={() => toggleExpand(sId)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, marginRight: '0.4rem', fontSize: '0.7rem' }}>{isExpS ? '▼' : '▶'}</button>
+                                {subv}
+                              </td>
+                              <td style={{ padding: '0.25rem 0.8rem', textAlign: 'right', color: '#10b981', fontSize: '0.75rem' }}>{tKey === 'INGRESO' ? fmtAmt(sNode.total) : ''}</td>
+                              <td style={{ padding: '0.25rem 0.8rem', textAlign: 'right', color: '#ef4444', fontSize: '0.75rem' }}>{tKey === 'GASTO' ? fmtAmt(sNode.total) : ''}</td>
+                              <td colSpan={2}></td>
+                            </tr>
+                          )
+                          if (isExpS) {
+                            Object.entries(sNode.cuentas).forEach(([cuenta, cMonto]) => {
+                              rows.push(
+                                <tr key={`${sId}-${cuenta}`} style={{ background: i % 2 === 0 ? 'rgba(0,0,0,0.04)' : 'var(--surface-overlay)' }}>
+                                  <td></td>
+                                  <td colSpan={8} style={{ padding: '0.2rem 0.8rem', paddingLeft: '4.6rem', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                    └ {cuenta}
+                                  </td>
+                                  <td style={{ padding: '0.2rem 0.8rem', textAlign: 'right', color: '#10b981', fontSize: '0.7rem', opacity: 0.8 }}>{tKey === 'INGRESO' ? fmtAmt(cMonto) : ''}</td>
+                                  <td style={{ padding: '0.2rem 0.8rem', textAlign: 'right', color: '#ef4444', fontSize: '0.7rem', opacity: 0.8 }}>{tKey === 'GASTO' ? fmtAmt(cMonto) : ''}</td>
+                                  <td colSpan={2}></td>
+                                </tr>
+                              )
+                            })
+                          }
+                        })
+                      }
+                    }
+                  })
+                }
+
+                return rows
               })}
             </tbody>
           </table>
@@ -2837,44 +2968,7 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
         </div>
       </div>
 
-      <WidgetWrapper widgetKey="te_complejidad_ive">
-        <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-          <h3 className="chart-title">Top 10 — IVE por Establecimiento (filtrado) — {periodo}</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
-            <span style={{ color: '#ef4444' }}>■</span> Alto ≥90% &nbsp;<span style={{ color: '#f59e0b' }}>■</span> Medio 70–90% &nbsp;<span style={{ color: '#10b981' }}>■</span> Bajo &lt;70%
-          </p>
-          {chartData.length === 0
-            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos para mostrar.</p>
-            : <ReactECharts option={iveBarOption} style={{ height: Math.max(280, chartData.length * 38) }} />
-          }
-        </div>
-      </WidgetWrapper>
-
-      <WidgetWrapper widgetKey="te_complejidad_matricula">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
-          <div className="chart-card">
-            <h3 className="chart-title">Matrícula por Nivel — {periodo}</h3>
-            <ReactECharts option={donaOption} style={{ height: 220 }} />
-            <div style={{ marginTop: '0.5rem' }}>
-              {nivel_resumen.map(n => (
-                <div key={n.nivel} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.8rem' }}>
-                  <span style={{ color: NIV_CLR[n.nivel] ?? 'var(--text-muted)', fontWeight: 600 }}>{n.nivel}</span>
-                  <span style={{ color: C.axisLabel }}>{n.n_establecimientos} EE · {fmtN(n.total_matricula)} mat. · IVE: <b style={{ color: iveColor(n.ive_promedio) }}>{(n.ive_promedio * 100).toFixed(1)}%</b></span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="chart-card">
-            <h3 className="chart-title">IVE Promedio por Comuna — Top 15</h3>
-            {comunasChart.length === 0
-              ? <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>Sin datos.</p>
-              : <ReactECharts option={comunaOption} style={{ height: Math.max(220, comunasChart.length * 26) }} />
-            }
-          </div>
-        </div>
-      </WidgetWrapper>
-
-      <WidgetWrapper widgetKey="te_complejidad_prioridades">
+      {/*<WidgetWrapper widgetKey="te_complejidad_prioridades">
         <div className="chart-card">
           <h3 className="chart-title">Distribución de Prioridades de Vulnerabilidad — {periodo}</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.75rem' }}>Suma total de alumnos por categoría de prioridad IVE-SINAE.</p>
@@ -2888,7 +2982,22 @@ ORDER BY ive.ive_sinae DESC NULLS LAST, ive.nom_establecimiento`
             ))}
           </div>
         </div>
-      </WidgetWrapper>
+      </WidgetWrapper>*/}
+
+      {/*<WidgetWrapper widgetKey="te_complejidad_scatter">
+        <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="chart-title">IVE vs Ingreso por Establecimiento — {periodo}</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+            Relación entre vulnerabilidad educativa (IVE SINAE) e ingresos rendidos. El tamaño del punto es proporcional a la matrícula.
+            <span style={{ marginLeft: 12, color: '#60a5fa' }}>● Básica</span>
+            <span style={{ marginLeft: 8, color: '#34d399' }}>● Media</span>
+          </p>
+          {iveFinData.length === 0
+            ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos financieros cruzados para este período.</p>
+            : <ReactECharts option={scatterIveFinOption} style={{ height: Math.max(320, iveFinData.length * 6 + 100) }} />
+          }
+        </div>
+      </WidgetWrapper>*/}
     </>
   )
 }
@@ -3066,6 +3175,9 @@ ORDER BY total_gasto DESC NULLS LAST;`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Análisis de la distribución territorial del Gasto Total y Costo por Alumno, segmentado por área geográfica (Rural/Urbano).
+      </div>
       <WidgetWrapper widgetKey="te_gasto_kpis">
         <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
           <KPICard icon="🏢" label="Centros de Costo" value={fmtN(resumen.total_centros)} color="#8b5cf6" sub="Establec. + Adm. Central" />
@@ -3416,7 +3528,6 @@ function renderWidgetContent(key, { rdbData, territorioData, periodo, sostId, lo
     // ── Educativo-Financiero ──────────────────────────────────────────────────
     case 'ef_ingreso_gasto':
     case 'ef_superavit':
-    case 'ef_remuneraciones':
       return <RenderFinancieroWidget rdbData={rdbData} periodo={periodo} widgetKey={key} />
     case 'ef_sned':
       return <SNEDSostenedor sostId={sostId} periodo={periodo} />
@@ -3449,9 +3560,8 @@ function renderWidgetContent(key, { rdbData, territorioData, periodo, sostId, lo
     case 'cf_analisis_rendicion':
       return <AnalisisRendicion sostId={sostId} periodo={periodo} />
     // ── Territorio ────────────────────────────────────────────────────────────
-    case 'te_complejidad_ive':
-    case 'te_complejidad_matricula':
     case 'te_complejidad_prioridades':
+    case 'te_complejidad_scatter':
       return <RenderComplejidadEducativa data={territorioData} periodo={periodo} widgetFilter={key} />
     case 'te_gasto_kpis':
     case 'te_gasto_tabla':
@@ -3508,21 +3618,6 @@ function RenderFinancieroWidget({ rdbData, periodo, widgetKey }) {
     return <ReactECharts option={opt} style={{ height: h }} />
   }
 
-  if (widgetKey === 'ef_remuneraciones') {
-    const remTop = [...remuneraciones_rbd].sort((a, b) => Number(b.total_liquido) - Number(a.total_liquido)).slice(0, 15)
-    const opt = {
-      tooltip: {
-        trigger: 'axis', ...C.tooltip,
-        formatter: params => { const d = remTop[params[0].dataIndex]; return `<b>${shortName(d.nom_rbd, d.rbd)}</b><br/>Total líq.: ${fmtAmt(d.total_liquido)}` }
-      },
-      grid: { left: 260, right: 80, top: 20, bottom: 20 },
-      xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
-      yAxis: { type: 'category', data: remTop.map(d => shortName(d.nom_rbd, d.rbd)), axisLabel: { color: C.axisLabel, fontSize: 10, width: 250, overflow: 'truncate' } },
-      series: [{ type: 'bar', barMaxWidth: 14, data: remTop.map(d => Number(d.total_liquido)), itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] } }],
-      backgroundColor: 'transparent',
-    }
-    return <ReactECharts option={opt} style={{ height: Math.max(280, remTop.length * 36) }} />
-  }
 
   return null
 }
