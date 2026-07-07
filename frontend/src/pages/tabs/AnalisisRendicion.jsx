@@ -309,6 +309,9 @@ ORDER BY monto_declarado DESC`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Detalle granular de montos rendidos obtenidos desde los comprobantes de ingreso y egreso, filtrables por cuenta y subvención.
+      </div>
       {/* ── Alerta informativa ──────────────────────────────────────── */}
       <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>
         📋 <strong>Análisis Rendición {periodo}{mes ? ` · ${MESES_FULL[mes]}` : ''}</strong>

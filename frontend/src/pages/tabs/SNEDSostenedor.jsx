@@ -282,6 +282,9 @@ GROUP BY rbd;`
   return (
     <>
       <SqlViewer sql={sqlStr} />
+      <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
+        ℹ️ <strong>Metodología:</strong> Análisis de desempeño y excelencia basado en el Sistema Nacional de Evaluación de Desempeño (SNED).
+      </div>
       {/* ── Banner informativo SNED ──────────────────────────────────────── */}
       <div style={{
         background: 'linear-gradient(135deg, #6366f110 0%, #8b5cf610 100%)',

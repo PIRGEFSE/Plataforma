@@ -1453,6 +1453,44 @@ async def ficha_sostenedor_territorio(
     total_np = sum(r.get("no_priorizado") or 0 for r in ive_establecimientos)
     total_si = sum(r.get("sin_informacion") or 0 for r in ive_establecimientos)
 
+    # ── Datos financieros por RBD desde estado_resultado ────────────────────
+    # Solo registros rendidos, excluyendo montos en 0
+    fin_q = await db.execute(text("""
+        SELECT
+            er.rbd,
+            er.sost_id,
+            er.cuenta_alias_padre,
+            er.desc_cuenta_padre,
+            er.desc_tipo_cuenta,
+            er.subvencion_alias,
+            SUM(er.monto_declarado) AS monto_declarado,
+            SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%INGRESO%'
+                     THEN er.monto_declarado ELSE 0 END) AS ingreso,
+            SUM(CASE WHEN UPPER(TRIM(er.desc_tipo_cuenta)) LIKE '%GASTO%'
+                     THEN er.monto_declarado ELSE 0 END) AS gasto
+        FROM estado_resultado er
+        WHERE er.sost_id = :sid
+          AND er.periodo  = :agno
+          AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+          AND er.monto_declarado <> 0
+        GROUP BY
+            er.rbd,
+            er.sost_id,
+            er.cuenta_alias_padre,
+            er.desc_cuenta_padre,
+            er.desc_tipo_cuenta,
+            er.subvencion_alias
+        ORDER BY er.rbd
+    """), {"sid": sost_id, "agno": agno})
+
+    financiero_por_rbd_raw = [dict(r) for r in fin_q.mappings()]
+
+    # Convertir Decimal a float
+    for row in financiero_por_rbd_raw:
+        for col in ("monto_declarado", "ingreso", "gasto"):
+            if row.get(col) is not None:
+                row[col] = float(row[col])
+
     return {
         "ive_establecimientos": ive_establecimientos,
         "nivel_resumen": nivel_resumen,
@@ -1468,6 +1506,7 @@ async def ficha_sostenedor_territorio(
             "no_priorizado": total_np,
             "sin_informacion": total_si,
         },
+        "financiero_por_rbd": financiero_por_rbd_raw,
         "periodos_disponibles": periodos_disponibles,
         "periodo_usado": agno,
     }
