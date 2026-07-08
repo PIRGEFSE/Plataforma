@@ -288,7 +288,7 @@ export default function Dashboard() {
       <main className="main-content">
         <div className="page-wrapper">
           <Routes>
-            <Route path="/" element={user?.role === 'sostenedor' ? <Navigate to="/mi-ficha" replace /> : user?.role === 'establecimiento' ? <Navigate to="/mi-establecimiento" replace /> : <Resumen />} />
+            <Route path="/" element={user?.role === 'sostenedor' ? <Navigate to="/mi-ficha/resumen" replace /> : user?.role === 'establecimiento' ? <Navigate to="/mi-establecimiento" replace /> : <Resumen />} />
             <Route path="/tendencia" element={<Tendencia />} />
             <Route path="/subvencion" element={<Subvencion />} />
             <Route path="/sostenedores" element={<Sostenedores />} />
