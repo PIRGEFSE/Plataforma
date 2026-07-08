@@ -28,6 +28,7 @@ class UserOut(BaseModel):
     role: str
     sost_id: Optional[int] = None
     rbd_id: Optional[int] = None
+    theme: Optional[str] = "dark"
     is_active: bool
     created_at: datetime
 

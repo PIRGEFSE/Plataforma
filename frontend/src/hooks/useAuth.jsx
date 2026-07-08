@@ -1,9 +1,11 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import api from '../lib/api'
+import { useTheme } from './useTheme'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const { setTheme } = useTheme()
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   })
@@ -13,7 +15,11 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('token')
     if (token) {
       api.get('/auth/me')
-        .then(r => { setUser(r.data); localStorage.setItem('user', JSON.stringify(r.data)) })
+        .then(r => { 
+          setUser(r.data); 
+          localStorage.setItem('user', JSON.stringify(r.data));
+          if (r.data.theme) setTheme(r.data.theme);
+        })
         .catch(() => { localStorage.removeItem('token'); localStorage.removeItem('user'); setUser(null) })
         .finally(() => setLoading(false))
     } else { setLoading(false) }
@@ -28,6 +34,7 @@ export function AuthProvider({ children }) {
     const me = await api.get('/auth/me')
     localStorage.setItem('user', JSON.stringify(me.data))
     setUser(me.data)
+    if (me.data.theme) setTheme(me.data.theme)
     return me.data
   }
 

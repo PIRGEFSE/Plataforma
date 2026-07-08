@@ -11,5 +11,6 @@ class User(Base):
     role = Column(String(20), nullable=False, default="viewer")  # "admin" | "viewer" | "sostenedor"
     sost_id = Column(BigInteger, nullable=True)  # solo para rol sostenedor
     rbd_id = Column(BigInteger, nullable=True)   # solo para rol establecimiento
+    theme = Column(String(10), default="dark")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

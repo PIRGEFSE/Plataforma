@@ -33,6 +33,26 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
+from pydantic import BaseModel
+class ThemeUpdate(BaseModel):
+    theme: str
+
+@router.put("/me/theme")
+async def update_theme(
+    payload: ThemeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import text
+    if payload.theme not in ["dark", "light"]:
+        raise HTTPException(status_code=400, detail="Invalid theme")
+    await db.execute(
+        text("UPDATE app_users SET theme = :theme WHERE id = :uid"),
+        {"theme": payload.theme, "uid": current_user.id},
+    )
+    await db.commit()
+    return {"ok": True, "theme": payload.theme}
+
 # ── Admin: user management ────────────────────────────────────────────────────
 
 @router.get("/users", response_model=list[UserOut])
