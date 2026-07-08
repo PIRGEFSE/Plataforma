@@ -2354,7 +2354,7 @@ async def save_resumen_pins(
     import json
     await db.execute(
         text(
-            "UPDATE app_users SET resumen_pins = :pins::jsonb WHERE id = :uid"
+            "UPDATE app_users SET resumen_pins = CAST(:pins AS jsonb) WHERE id = :uid"
         ),
         {"pins": json.dumps(payload.pins), "uid": current_user.id},
     )
