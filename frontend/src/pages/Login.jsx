@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true)
     try {
       const me = await login(form.username, form.password)
-      navigate(me?.role === 'sostenedor' ? '/mi-ficha' : '/')
+      navigate(me?.role === 'sostenedor' ? '/mi-ficha/resumen' : me?.role === 'establecimiento' ? '/mi-establecimiento' : '/')
     } catch {
       setError('Usuario o contraseña incorrectos')
     } finally {
