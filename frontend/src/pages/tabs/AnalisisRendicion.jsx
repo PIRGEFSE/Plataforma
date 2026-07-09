@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
-import { fmtMM, fmtN } from '../../lib/format'
+import { fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
+import { useMoneyFmt } from './FichaSostenedor'
 
 import SqlViewer from '../../components/SqlViewer'
 
@@ -22,12 +23,33 @@ const PALETTE = [
 
 const ITEMS_PER_PAGE = 15
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function fmt(v) {
-  const n = Number(v) || 0
-  return fmtMM(n)
+const MAP_TIPO_DOC = {
+  'BOL': 'BOLETA',
+  'BOLE': 'BOLETA EXENTA',
+  'BOLH': 'BOLETA HONORARIOS',
+  'BHE': 'BOLETA HONORARIOS',
+  'FAC': 'FACTURA',
+  'FACE': 'FACTURA EXENTA',
+  'ODE': 'OTRO DOCUMENTO',
+  'BOLEC': 'BOLETA ELECTRONICA',
+  'BOLEX': 'BOLETA EXENTA',
+  'BOLHE': 'BOLETA HONORARIOS ELECTRONICA',
+  'FACEL': 'FACTURA ELECTRONICA',
+  'FACEX': 'FACTURA EXENTA',
+  'FIN': 'FINIQUITO',
+  'BPST': 'BOLETA HONORARIOS',
+  'BPSTE': 'BOLETA HONORARIOS',
+  'DOCEX': 'DOCUMENTO EXENTO',
+  'NOTACRE': 'NOTA DE CREDITO',
+  'PLANILLA': 'PLANILLA DE PAGO',
+  'NOTADEB': 'NOTA DE DEBITO'
 }
 
+function getNombreDoc(abrev) {
+  return MAP_TIPO_DOC[abrev] || abrev
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function KPICard({ icon, label, value, color = '#6366f1', sub }) {
   return (
     <div className="kpi-card" style={{ '--accent': color }}>
@@ -53,17 +75,18 @@ const selSt = {
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function AnalisisRendicion({ sostId, periodo }) {
   const C = useChartColors()
-  const [data, setData]       = useState(null)
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useMoneyFmt()
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
+  const [error, setError] = useState(null)
 
   // Filtros locales
-  const [mes, setMes]               = useState('')
+  const [mes, setMes] = useState('')
   const [cuentaPadre, setCuentaPadre] = useState('')
   const [subvencion, setSubvencion] = useState('')
-  const [tipoDoc, setTipoDoc]       = useState('')
-  const [search, setSearch]         = useState('')
-  const [page, setPage]             = useState(0)
+  const [tipoDoc, setTipoDoc] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
 
   // Carga datos cuando cambia periodo o mes
   useEffect(() => {
@@ -85,9 +108,9 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     if (!data) return { cuentas: [], subvenciones: [], tipos: [] }
     const det = data.detalle
     return {
-      cuentas:     [...new Set(det.map(d => d.desc_cuenta_padre))].sort(),
-      subvenciones:[...new Set(det.map(d => d.subvencion_alias))].sort(),
-      tipos:       [...new Set(det.map(d => d.tipo_docs_alias))].sort(),
+      cuentas: [...new Set(det.map(d => d.desc_cuenta_padre))].sort(),
+      subvenciones: [...new Set(det.map(d => d.subvencion_alias))].sort(),
+      tipos: [...new Set(det.map(d => d.tipo_docs_alias))].sort(),
     }
   }, [data])
 
@@ -96,9 +119,9 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     if (!data) return []
     const txt = search.toLowerCase().trim()
     return data.detalle.filter(d => {
-      const matchCP  = !cuentaPadre || d.desc_cuenta_padre === cuentaPadre
-      const matchSub = !subvencion  || d.subvencion_alias  === subvencion
-      const matchTip = !tipoDoc     || d.tipo_docs_alias   === tipoDoc
+      const matchCP = !cuentaPadre || d.desc_cuenta_padre === cuentaPadre
+      const matchSub = !subvencion || d.subvencion_alias === subvencion
+      const matchTip = !tipoDoc || d.tipo_docs_alias === tipoDoc
       const matchTxt = !txt || [
         d.desc_cuenta, d.subvencion_alias, d.tipo_docs_alias,
         d.desc_libro, String(d.rbd ?? ''),
@@ -107,19 +130,19 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     })
   }, [data, cuentaPadre, subvencion, tipoDoc, search])
 
-  const totalPages  = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
-  const safePage    = Math.min(page, totalPages - 1)
-  const paginated   = filtered.slice(safePage * ITEMS_PER_PAGE, (safePage + 1) * ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1
+  const safePage = Math.min(page, totalPages - 1)
+  const paginated = filtered.slice(safePage * ITEMS_PER_PAGE, (safePage + 1) * ITEMS_PER_PAGE)
 
   if (loading) return <div className="loading-area"><div className="spinner" /></div>
-  if (error)   return <div className="empty-state" style={{ color: '#ef4444' }}>{error}</div>
-  if (!data)   return null
+  if (error) return <div className="empty-state" style={{ color: '#ef4444' }}>{error}</div>
+  if (!data) return null
 
   const { resumen, serie_mensual, por_cuenta_padre, por_subvencion, por_tipo_doc } = data
 
   // ── Gráfico 1: Serie mensual ──────────────────────────────────────────────
   const serieLabels = MESES.slice(1)
-  const serieData   = serieLabels.map((_, i) => {
+  const serieData = serieLabels.map((_, i) => {
     const found = serie_mensual.find(s => s.mes === i + 1)
     return found ? found.total_monto : 0
   })
@@ -130,7 +153,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
         const p = params[0]
         const m = serie_mensual.find(s => s.mes === p.dataIndex + 1)
         return `<b>${MESES_FULL[p.dataIndex + 1]} ${periodo}</b><br/>
-          Monto: <b>${fmt(p.value)}</b><br/>
+          Monto: <b>${fmtAmt(p.value)}</b><br/>
           Documentos: ${fmtN(m?.n_docs ?? 0)}`
       },
     },
@@ -142,7 +165,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: C.axisLabel, formatter: v => fmtMM(v) },
+      axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) },
       splitLine: { lineStyle: { color: C.splitLine } },
     },
     series: [{
@@ -150,7 +173,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] },
       label: {
         show: true, position: 'top',
-        formatter: p => p.value > 0 ? fmtMM(p.value) : '',
+        formatter: p => p.value > 0 ? fmtAxisAmt(p.value) : '',
         color: C.axisLabel, fontSize: 9,
       },
     }],
@@ -161,7 +184,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
   const pieOption = {
     tooltip: {
       trigger: 'item', ...C.tooltip,
-      formatter: p => `<b>${p.name}</b><br/>Monto: ${fmt(p.value)}<br/>${p.percent.toFixed(1)}%`,
+      formatter: p => `<b>${p.name}</b><br/>Monto: ${fmtAmt(p.value)}<br/>${p.percent.toFixed(1)}%`,
     },
     legend: {
       orient: 'vertical', left: '52%', top: 'center',
@@ -188,13 +211,14 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
       formatter: params => {
         const d = subvRev[params[0].dataIndex]
-        return `<b>${d.subvencion_alias}</b><br/>Monto: ${fmt(d.total_monto)}<br/>Docs: ${fmtN(d.n_docs)}`
+        return `<b>${d.subvencion_alias}</b><br/>Monto: ${fmtAmt(d.total_monto)}<br/>Docs: ${fmtN(d.n_docs)}`
       },
     },
     grid: { left: 220, right: 80, top: 10, bottom: 10 },
     xAxis: {
+      show: false,
       type: 'value',
-      axisLabel: { color: C.axisLabel, formatter: v => fmtMM(v) },
+      axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) },
       splitLine: { lineStyle: { color: C.splitLine } },
     },
     yAxis: {
@@ -210,7 +234,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       })),
       label: {
         show: true, position: 'right',
-        formatter: p => fmt(p.value),
+        formatter: p => fmtAmt(p.value),
         color: C.axisLabel, fontSize: 10,
       },
     }],
@@ -224,18 +248,23 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
       formatter: params => {
         const d = tipoRev[params[0].dataIndex]
-        return `<b>${d.tipo_docs_alias}</b><br/>Monto: ${fmt(d.total_monto)}<br/>Docs: ${fmtN(d.n_docs)}`
+        const nombreDoc = getNombreDoc(d.tipo_docs_alias)
+        return `<b>${nombreDoc}</b><br/>Monto: ${fmtAmt(d.total_monto)}<br/>Docs: ${fmtN(d.n_docs)}`
       },
     },
     grid: { left: 200, right: 80, top: 10, bottom: 10 },
     xAxis: {
+      show: false,
       type: 'value',
-      axisLabel: { color: C.axisLabel, formatter: v => fmtMM(v) },
+      axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) },
       splitLine: { lineStyle: { color: C.splitLine } },
     },
     yAxis: {
       type: 'category',
-      data: tipoRev.map(d => d.tipo_docs_alias.length > 28 ? d.tipo_docs_alias.slice(0, 26) + '…' : d.tipo_docs_alias),
+      data: tipoRev.map(d => {
+        const nombreDoc = getNombreDoc(d.tipo_docs_alias)
+        return nombreDoc.length > 28 ? nombreDoc.slice(0, 26) + '…' : nombreDoc
+      }),
       axisLabel: { color: C.axisLabel, fontSize: 10, width: 190, overflow: 'truncate' },
     },
     series: [{
@@ -246,7 +275,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       })),
       label: {
         show: true, position: 'right',
-        formatter: p => fmt(p.value),
+        formatter: p => fmtAmt(p.value),
         color: C.axisLabel, fontSize: 10,
       },
     }],
@@ -312,21 +341,21 @@ ORDER BY monto_declarado DESC`
       <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 12 }}>
         ℹ️ <strong>Metodología:</strong> Detalle granular de montos rendidos obtenidos desde los comprobantes de ingreso y egreso, filtrables por cuenta y subvención.
       </div>
-      {/* ── Alerta informativa ──────────────────────────────────────── */}
+      {/* ── Alerta informativa ──────────────────────────────────────── 
       <div className="alert-info" style={{ padding: '10px 16px', borderRadius: 10, fontSize: '0.82rem', marginBottom: 14 }}>
         📋 <strong>Análisis Rendición {periodo}{mes ? ` · ${MESES_FULL[mes]}` : ''}</strong>
         &nbsp;— Monto declarado de documentos agrupados por cuenta, subvención y tipo, filtrado por sostenedor.
-      </div>
+      </div>*/}
 
       {/* ── KPIs ────────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-        <KPICard icon="💰" label={`Monto Total (mM$)`} value={fmt(resumen.total_monto)} color="#6366f1" sub={`Año ${periodo}${mes ? ` · ${MESES_FULL[mes]}` : ''}`} />
+        <KPICard icon="💰" label={`Monto Total (${unitLabel})`} value={fmtAmt(resumen.total_monto)} color="#6366f1" sub={`Año ${periodo}${mes ? ` · ${MESES_FULL[mes]}` : ''}`} />
         <KPICard icon="📄" label="N° Documentos" value={fmtN(resumen.total_docs)} color="#10b981" sub="Registros contabilizados" />
         <KPICard icon="🏫" label="Establecimientos (RBD)" value={fmtN(resumen.n_rbd)} color="#f59e0b" sub="Con documentos en el período" />
         <KPICard icon="📊" label="Categorías de Cuenta" value={fmtN(por_cuenta_padre.length)} color="#8b5cf6" sub="Cuentas padre distintas" />
       </div>
 
-      {/* ── Filtro de mes ───────────────────────────────────────────── */}
+      {/* ── Filtro de mes ───────────────────────────────────────────── 
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 600 }}>Filtrar por:</span>
         <select style={selSt} value={mes} onChange={e => setMes(e.target.value ? Number(e.target.value) : '')}>
@@ -338,16 +367,16 @@ ORDER BY monto_declarado DESC`
             ✕ Todos los meses
           </button>
         )}
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+        {<span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
           {resumen.anios_disponibles?.length > 0 && (
             <>Años disponibles: <b style={{ color: 'var(--text-primary)' }}>{resumen.anios_disponibles.join(', ')}</b></>
           )}
         </span>
-      </div>
+      </div>*/}
 
       {/* ── Gráfico serie mensual ────────────────────────────────────── */}
       <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">Monto Declarado por Mes — {periodo} (mM$)</h3>
+        <h3 className="chart-title">Monto Declarado por Mes — {periodo} ({unitLabel})</h3>
         {serie_mensual.length === 0
           ? <div className="empty-state">Sin datos para el período seleccionado</div>
           : <ReactECharts option={serieOption} style={{ height: 260 }} />
@@ -374,7 +403,7 @@ ORDER BY monto_declarado DESC`
 
       {/* ── Gráfico subvenciones ─────────────────────────────────────── */}
       <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">Top Subvenciones — Monto Declarado (mM$)</h3>
+        <h3 className="chart-title">Top Subvenciones — Monto Declarado ({unitLabel})</h3>
         {por_subvencion.length === 0
           ? <div className="empty-state">Sin datos</div>
           : <ReactECharts option={subvOption} style={{ height: Math.max(200, por_subvencion.length * 34) }} />
@@ -400,7 +429,7 @@ ORDER BY monto_declarado DESC`
         </select>
         <select style={selSt} value={tipoDoc} onChange={e => setTipoDoc(e.target.value)}>
           <option value="">Tipo Doc: Todos</option>
-          {opts.tipos.map(t => <option key={t} value={t}>{t}</option>)}
+          {opts.tipos.map(t => <option key={t} value={t}>{getNombreDoc(t)}</option>)}
         </select>
         {(search || cuentaPadre || subvencion || tipoDoc) && (
           <button
@@ -435,16 +464,16 @@ ORDER BY monto_declarado DESC`
             <thead>
               <tr style={{ background: 'var(--surface-overlay)' }}>
                 {[
-                  { h: 'Año',         a: 'center' },
-                  { h: 'Mes',         a: 'center' },
-                  { h: 'RBD',         a: 'left'   },
-                  { h: 'Libro',       a: 'left'   },
-                  { h: 'Cuenta Padre',a: 'left'   },
-                  { h: 'Cuenta',      a: 'left'   },
-                  { h: 'Subvención',  a: 'left'   },
-                  { h: 'Tipo Doc',    a: 'left'   },
-                  { h: 'N° Docs',     a: 'right'  },
-                  { h: 'Monto (mM$)', a: 'right'  },
+                  { h: 'Año', a: 'center' },
+                  { h: 'Mes', a: 'center' },
+                  { h: 'RBD', a: 'left' },
+                  { h: 'Libro', a: 'left' },
+                  { h: 'Cuenta Padre', a: 'left' },
+                  { h: 'Cuenta', a: 'left' },
+                  { h: 'Subvención', a: 'left' },
+                  { h: 'Tipo Doc', a: 'left' },
+                  { h: 'N° Docs', a: 'right' },
+                  { h: `Monto (${unitLabel})`, a: 'right' },
                 ].map(({ h, a }) => (
                   <th key={h} style={{
                     padding: '0.55rem 0.75rem',
@@ -473,9 +502,9 @@ ORDER BY monto_declarado DESC`
                   </td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={d.desc_cuenta}>{d.desc_cuenta}</td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#10b981', fontSize: '0.72rem', fontWeight: 600 }} title={d.subvencion_alias}>{d.subvencion_alias}</td>
-                  <td style={{ padding: '0.4rem 0.75rem', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }} title={d.tipo_docs_alias}>{d.tipo_docs_alias}</td>
+                  <td style={{ padding: '0.4rem 0.75rem', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }} title={getNombreDoc(d.tipo_docs_alias)}>{getNombreDoc(d.tipo_docs_alias)}</td>
                   <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{fmtN(d.n_docs)}</td>
-                  <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#6366f1', fontVariantNumeric: 'tabular-nums' }}>{fmt(d.monto_declarado)}</td>
+                  <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#6366f1', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(d.monto_declarado)}</td>
                 </tr>
               ))}
             </tbody>

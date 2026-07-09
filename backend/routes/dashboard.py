@@ -1534,13 +1534,16 @@ async def ficha_sostenedor_gasto_educativo(
             COUNT(d.id) as num_documentos,
             eo.estado_estab, 
             eo.matricula,
+            eo.mat_total,
+            eo.latitud,
+            eo.longitud,
             eo.rural_rbd,
             eo.cod_com_rbd,
             eo.nom_com_rbd
         FROM documentos d
         LEFT JOIN dim_establecimiento_oficial eo ON eo.rbd = d.rbd AND eo.agno = d.periodo
         WHERE d.sost_id = :sid AND d.periodo = :agno
-        GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
+        GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.mat_total, eo.latitud, eo.longitud, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
         ORDER BY total_gasto DESC NULLS LAST
     """), {"sid": sost_id, "agno": periodo})
     
@@ -1555,11 +1558,12 @@ async def ficha_sostenedor_gasto_educativo(
     q_cuenta = await db.execute(text("""
         SELECT 
             COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN') as categoria, 
+            COALESCE(desc_cuenta, 'SIN INFORMACIÓN') as sub_categoria,
             SUM(monto_declarado) as total_gasto
         FROM documentos
         WHERE sost_id = :sid AND periodo = :agno
-        GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN')
-        ORDER BY total_gasto DESC NULLS LAST
+        GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN'), COALESCE(desc_cuenta, 'SIN INFORMACIÓN')
+        ORDER BY categoria, total_gasto DESC NULLS LAST
     """), {"sid": sost_id, "agno": periodo})
     
     gasto_por_cuenta = []

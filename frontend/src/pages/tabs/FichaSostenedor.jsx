@@ -1172,8 +1172,8 @@ function RenderCostoAlumno({ sostId, periodo, widgetFilter = null }) {
       }
     },
     grid: { left: 270, right: 80, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: C.axisLabel, fontSize: 10, width: 260, overflow: 'truncate' } },
+    xAxis: { show: false, type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'category', inverse: true, data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: C.axisLabel, fontSize: 10, width: 260, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 18,
       data: chartData.map(d => ({ value: d.costo_por_alumno, itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] } })),
@@ -1440,9 +1440,9 @@ function RenderGastoAdministrativo({ sostId, periodo, widgetFilter = null }) {
         return `<b>${d.fun}</b><br/>Gasto: <b style="color:#8b5cf6">${fmtAmt(d.total)}</b>`
       }
     },
-    grid: { left: 80, right: 30, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: gasto_por_funcion.map(d => d.fun.length > 30 ? d.fun.slice(0, 28) + '...' : d.fun), axisLabel: { color: C.axisLabel, fontSize: 10, width: 140, overflow: 'truncate' } },
+    grid: { left: 80, right: 30, top: 20, bottom: 20, containLabel: true },
+    xAxis: { show: false, type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'category', inverse: true, data: gasto_por_funcion.map(d => d.fun.length > 30 ? d.fun.slice(0, 28) + '...' : d.fun), axisLabel: { color: C.axisLabel, fontSize: 10, width: 140, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 18,
       data: gasto_por_funcion.map(d => ({ value: d.total, itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] } })),
@@ -1550,7 +1550,7 @@ ORDER BY total DESC LIMIT 10;`
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Gasto por Tipo de Función (FUN)</h3>
+          <h3 className="chart-title">Top 10 — Gasto por Tipo de Función</h3>
           {gasto_por_funcion.length === 0
             ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
             : <ReactECharts option={barOption} style={{ height: Math.max(280, gasto_por_funcion.length * 38) }} />
@@ -3008,6 +3008,7 @@ function RenderGastoEducativo({ sostId, periodo, widgetFilter = null }) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [selectedCategory, setSelectedCategory] = useState(null)
   const { fmtAmt: fmt } = useMoneyFmt()
   const ITEMS_PER_PAGE = 10
 
@@ -3046,21 +3047,26 @@ function RenderGastoEducativo({ sostId, periodo, widgetFilter = null }) {
   // ttStyle removed }
 
   // Gráfico: Top 10 gastos
-  const chartData = [...filtered].sort((a, b) => (b.total_gasto ?? 0) - (a.total_gasto ?? 0)).slice(0, 10)
+  const chartData = [...filtered].sort((a, b) => {
+    const gpaA = a.mat_total > 0 ? a.total_gasto / a.mat_total : 0;
+    const gpaB = b.mat_total > 0 ? b.total_gasto / b.mat_total : 0;
+    return gpaB - gpaA;
+  }).slice(0, 10)
   const barOption = {
     tooltip: {
       trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip,
       formatter: params => {
         const d = chartData[params[0].dataIndex]
-        return `<b>${d.nombre_rbd}</b> ${d.rbd ? `(${d.rbd})` : ''}<br/>Monto: <b style="color:#10b981">${fmt(d.total_gasto)}</b><br/>Documentos: ${fmtN(d.num_documentos)}`
+        const val = d.mat_total > 0 ? d.total_gasto / d.mat_total : 0;
+        return `<b>${d.nombre_rbd}</b> ${d.rbd ? `(${d.rbd})` : ''}<br/>Monto por Alumno: <b style="color:#10b981">${fmt(val)}</b><br/>Matrícula: ${fmtN(d.mat_total || 0)}<br/>Gasto Total: ${fmt(d.total_gasto)}<br/>Documentos: ${fmtN(d.num_documentos)}`
       }
     },
     grid: { left: 270, right: 80, top: 20, bottom: 20 },
-    xAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
-    yAxis: { type: 'category', data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: C.axisLabel, fontSize: 10, width: 260, overflow: 'truncate' } },
+    xAxis: { show: false, type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'category', inverse: true, data: chartData.map(d => (d.nombre_rbd?.length > 36 ? d.nombre_rbd.slice(0, 34) + '…' : d.nombre_rbd) || 'Sin nombre'), axisLabel: { color: C.axisLabel, fontSize: 10, width: 260, overflow: 'truncate' } },
     series: [{
       type: 'bar', barMaxWidth: 18,
-      data: chartData.map(d => ({ value: d.total_gasto, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } })),
+      data: chartData.map(d => ({ value: d.mat_total > 0 ? d.total_gasto / d.mat_total : 0, itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } })),
       label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 10, color: 'var(--text-primary)' }
     }],
     backgroundColor: 'transparent',
@@ -3068,7 +3074,14 @@ function RenderGastoEducativo({ sostId, periodo, widgetFilter = null }) {
 
   // Gráfico: Gasto por Cuenta Padre
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b']
-  const cuentaChart = [...gasto_por_cuenta].sort((a, b) => b.total_gasto - a.total_gasto)
+
+  const groupedCuenta = gasto_por_cuenta.reduce((acc, curr) => {
+    if (!acc[curr.categoria]) acc[curr.categoria] = 0;
+    acc[curr.categoria] += curr.total_gasto;
+    return acc;
+  }, {});
+  const cuentaChart = Object.keys(groupedCuenta).map(k => ({ categoria: k, total_gasto: groupedCuenta[k] })).sort((a, b) => b.total_gasto - a.total_gasto)
+
   const pieOption = {
     tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Monto: ${fmt(p.value)}<br/>${p.percent.toFixed(1)}%` },
     legend: { orient: 'vertical', left: '55%', top: 'center', textStyle: { color: C.axisLabel, fontSize: 10 }, formatter: name => name.length > 40 ? name.slice(0, 38) + '...' : name },
@@ -3079,6 +3092,7 @@ function RenderGastoEducativo({ sostId, periodo, widgetFilter = null }) {
     }],
     backgroundColor: 'transparent',
   }
+  const pieEvents = { click: (e) => setSelectedCategory(e.name) }
 
   const sqlStr = `-- Gasto por Establecimiento / Centro de costo
 SELECT 
@@ -3088,23 +3102,27 @@ SELECT
     COUNT(d.id) as num_documentos,
     eo.estado_estab, 
     eo.matricula,
+    eo.mat_total,
+    eo.latitud,
+    eo.longitud,
     eo.rural_rbd,
     eo.cod_com_rbd,
     eo.nom_com_rbd
 FROM documentos d
 LEFT JOIN dim_establecimiento_oficial eo ON d.rbd = eo.rbd AND eo.agno = d.periodo
 WHERE d.sost_id = :sid AND d.periodo = :agno
-GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
+GROUP BY d.rbd, d.nombre_rbd, eo.estado_estab, eo.matricula, eo.mat_total, eo.latitud, eo.longitud, eo.rural_rbd, eo.cod_com_rbd, eo.nom_com_rbd
 ORDER BY total_gasto DESC NULLS LAST;
 
 -- Gasto por Cuenta Padre
 SELECT 
     COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN') as categoria, 
+    COALESCE(desc_cuenta, 'SIN INFORMACIÓN') as sub_categoria,
     SUM(monto_declarado) as total_gasto
 FROM documentos
 WHERE sost_id = :sid AND periodo = :agno
-GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN')
-ORDER BY total_gasto DESC NULLS LAST;`
+GROUP BY COALESCE(desc_cuenta_padre, 'SIN INFORMACIÓN'), COALESCE(desc_cuenta, 'SIN INFORMACIÓN')
+ORDER BY categoria, total_gasto DESC NULLS LAST;`
 
   // ── Early return para el tab Resumen (solo fragmento específico) ─────────────
   if (widgetFilter === 'te_gasto_kpis') {
@@ -3129,13 +3147,13 @@ ORDER BY total_gasto DESC NULLS LAST;`
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
             <thead>
               <tr style={{ background: 'var(--surface-overlay)' }}>
-                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
+                {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Matrícula', a: 'right' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
                   <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+              {paginated.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
               {paginated.map((ee, i) => (
                 <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
                   <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
@@ -3145,6 +3163,7 @@ ORDER BY total_gasto DESC NULLS LAST;`
                   <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel }}>{fmtN(ee.num_documentos)}</td>
                   <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : (ee.rbd ? '·' : '')}</td>
                   <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_com_rbd || ''}</td>
+                  <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.mat_total || 0)}</td>
                   <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 700 }}>{fmt(ee.total_gasto)}</td>
                 </tr>
               ))}
@@ -3158,7 +3177,7 @@ ORDER BY total_gasto DESC NULLS LAST;`
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div className="chart-card">
-          <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
+          <h3 className="chart-title">Top 10 — Mayor Gasto por Alumno (filtrado)</h3>
           {chartData.length === 0
             ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
             : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
@@ -3166,7 +3185,25 @@ ORDER BY total_gasto DESC NULLS LAST;`
         </div>
         <div className="chart-card">
           <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
-          <ReactECharts option={pieOption} style={{ height: 300 }} />
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Haz clic en una categoría para ver sus sub-categorías.</p>
+          <ReactECharts option={pieOption} style={{ height: 300 }} onEvents={pieEvents} />
+          {selectedCategory && (
+            <div style={{ marginTop: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>Sub-categorías: {selectedCategory}</h4>
+              <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                  <tbody>
+                    {gasto_por_cuenta.filter(c => c.categoria === selectedCategory).sort((a, b) => b.total_gasto - a.total_gasto).map(sub => (
+                      <tr key={sub.sub_categoria} style={{ borderBottom: '1px solid var(--line-subtle)' }}>
+                        <td style={{ padding: '0.3rem', color: 'var(--text-primary)' }}>{sub.sub_categoria}</td>
+                        <td style={{ padding: '0.3rem', textAlign: 'right', fontWeight: 600 }}>{fmt(sub.total_gasto)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -3210,13 +3247,13 @@ ORDER BY total_gasto DESC NULLS LAST;`
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-overlay)' }}>
-                  {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
+                  {[{ h: 'RBD', a: 'left' }, { h: 'Nombre / Centro Costo', a: 'left' }, { h: 'Nº Docs', a: 'right' }, { h: 'Rural', a: 'center' }, { h: 'Comuna', a: 'left' }, { h: 'Matrícula', a: 'right' }, { h: 'Monto Total', a: 'right' }].map(({ h, a }) => (
                     <th key={h} style={{ padding: '0.55rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paginated.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
+                {paginated.length === 0 && <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin resultados para «{search}»</td></tr>}
                 {paginated.map((ee, i) => (
                   <tr key={`${ee.rbd}-${ee.nombre_rbd}`} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
                     <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontFamily: 'monospace', fontSize: '0.76rem' }}>{ee.rbd || 'N/A'}</td>
@@ -3226,6 +3263,7 @@ ORDER BY total_gasto DESC NULLS LAST;`
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.num_documentos)}</td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'center', color: ee.rural_rbd === 1 ? '#f59e0b' : 'var(--line-subtle)' }}>{ee.rural_rbd === 1 ? '🌿' : (ee.rbd ? '·' : '')}</td>
                     <td style={{ padding: '0.45rem 0.8rem', color: C.axisLabel, fontSize: '0.76rem' }}>{ee.nom_com_rbd || ''}</td>
+                    <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>{fmtN(ee.mat_total || 0)}</td>
                     <td style={{ padding: '0.45rem 0.8rem', textAlign: 'right', color: '#10b981', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(ee.total_gasto)}</td>
                   </tr>
                 ))}
@@ -3246,7 +3284,7 @@ ORDER BY total_gasto DESC NULLS LAST;`
       <WidgetWrapper widgetKey="te_gasto_graficos">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
           <div className="chart-card">
-            <h3 className="chart-title">Top 10 — Mayor Gasto (filtrado)</h3>
+            <h3 className="chart-title">Top 10 — Mayor Gasto por Alumno (filtrado)</h3>
             {chartData.length === 0
               ? <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>Sin datos.</p>
               : <ReactECharts option={barOption} style={{ height: Math.max(280, chartData.length * 38) }} />
@@ -3254,15 +3292,34 @@ ORDER BY total_gasto DESC NULLS LAST;`
           </div>
           <div className="chart-card">
             <h3 className="chart-title">Gasto por Categoría (Cuenta Padre)</h3>
-            <ReactECharts option={pieOption} style={{ height: 300 }} />
-            <div style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
-              {cuentaChart.map((c, i) => (
-                <div key={c.categoria} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.75rem' }}>
-                  <span style={{ color: COLORS[i % COLORS.length] || 'var(--text-muted)', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.categoria}>{c.categoria}</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600, marginLeft: '0.5rem' }}>{fmt(c.total_gasto)}</span>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem' }}>Haz clic en una categoría para ver sus sub-categorías.</p>
+            <ReactECharts option={pieOption} style={{ height: 300 }} onEvents={pieEvents} />
+            {selectedCategory ? (
+              <div style={{ marginTop: '1rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem' }}>Sub-categorías: {selectedCategory}</h4>
+                <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <tbody>
+                      {gasto_por_cuenta.filter(c => c.categoria === selectedCategory).sort((a, b) => b.total_gasto - a.total_gasto).map(sub => (
+                        <tr key={sub.sub_categoria} style={{ borderBottom: '1px solid var(--line-subtle)' }}>
+                          <td style={{ padding: '0.3rem', color: 'var(--text-primary)' }}>{sub.sub_categoria}</td>
+                          <td style={{ padding: '0.3rem', textAlign: 'right', fontWeight: 600 }}>{fmt(sub.total_gasto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                {cuentaChart.map((c, i) => (
+                  <div key={c.categoria} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--line-subtle)', fontSize: '0.75rem' }}>
+                    <span style={{ color: COLORS[i % COLORS.length] || 'var(--text-muted)', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.categoria}>{c.categoria}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600, marginLeft: '0.5rem' }}>{fmt(c.total_gasto)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </WidgetWrapper>
