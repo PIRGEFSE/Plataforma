@@ -2364,3 +2364,265 @@ async def save_resumen_pins(
     )
     await db.commit()
     return {"ok": True, "pins": payload.pins}
+
+
+# ── Presupuesto Sostenedor — Proyectado vs Ejecutado ─────────────────────────
+
+@router.get("/ficha-sostenedor/presupuesto")
+async def ficha_sostenedor_presupuesto(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2023),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Análisis Presupuestario del Sostenedor.
+
+    Cruza:
+      - Presupuesto PROYECTADO: tabla dim_monto_subvencion (subvenciones MINEDUC)
+      - Presupuesto EJECUTADO:  tabla estado_resultado (Ingresos rendidos)
+
+    La relación es por rbd + agno/periodo.
+    Nota: dim_monto_subvencion solo tiene datos para 2023.
+    """
+
+    # ── 0. Años disponibles en dim_monto_subvencion para este sostenedor ──────
+    agno_q = await db.execute(text("""
+        SELECT DISTINCT agno FROM dim_monto_subvencion
+        WHERE rut_sostenedor = :sid
+        ORDER BY agno DESC
+    """), {"sid": sost_id})
+    agno_disponibles = [r[0] for r in agno_q.fetchall()]
+    agno_usado = periodo if periodo in agno_disponibles else (agno_disponibles[0] if agno_disponibles else periodo)
+
+    # ── 1. Presupuesto PROYECTADO por RBD (dim_monto_subvencion) ─────────────
+    proy_q = await db.execute(text("""
+        SELECT
+            rbd,
+            nombre_rbd,
+            SUM(sub_normal)                     AS sub_normal,
+            SUM(escolaridad_pie)                AS escolaridad_pie,
+            SUM(monto_asig_zona)                AS monto_asig_zona,
+            SUM(subv_asistentes_educacion)      AS subv_asistentes_educacion,
+            SUM(sned)                           AS sned,
+            SUM(mantenimiento)                  AS mantenimiento,
+            SUM(apor_gratuidad)                 AS apor_gratuidad,
+            SUM(sep_prio)                       AS sep_prio,
+            SUM(sep_pref)                       AS sep_pref,
+            SUM(desempeno_dificil)              AS desempeno_dificil,
+            SUM(desempeno_dificil_nodoc)        AS desempeno_dificil_nodoc,
+            SUM(subv_adicional_especial)        AS subv_adicional_especial,
+            SUM(profesor_encargado)             AS profesor_encargado,
+            SUM(internado)                      AS internado,
+            SUM(ruralidad)                      AS ruralidad,
+            SUM(piso_rural)                     AS piso_rural,
+            SUM(matricula) / NULLIF(COUNT(*), 0) AS promedio_matricula,
+            -- Total proyectado = todos los componentes de subvención
+            SUM(
+                sub_normal + escolaridad_pie + monto_asig_zona +
+                subv_asistentes_educacion + sned + mantenimiento +
+                apor_gratuidad + sep_prio + sep_pref +
+                desempeno_dificil + desempeno_dificil_nodoc +
+                subv_adicional_especial + profesor_encargado +
+                internado + ruralidad + piso_rural
+            ) AS total_proyectado
+        FROM dim_monto_subvencion
+        WHERE rut_sostenedor = :sid AND agno = :agno
+        GROUP BY rbd, nombre_rbd
+        ORDER BY total_proyectado DESC NULLS LAST
+    """), {"sid": sost_id, "agno": agno_usado})
+
+    proyectado_por_rbd = {}
+    for r in proy_q.mappings():
+        row = dict(r)
+        for k in ["sub_normal", "escolaridad_pie", "monto_asig_zona",
+                  "subv_asistentes_educacion", "sned", "mantenimiento",
+                  "apor_gratuidad", "sep_prio", "sep_pref",
+                  "desempeno_dificil", "desempeno_dificil_nodoc",
+                  "subv_adicional_especial", "profesor_encargado",
+                  "internado", "ruralidad", "piso_rural", "total_proyectado",
+                  "promedio_matricula"]:
+            if row.get(k) is not None:
+                row[k] = float(row[k])
+        proyectado_por_rbd[row["rbd"]] = row
+
+    # ── 2. Presupuesto EJECUTADO por RBD (estado_resultado — Ingresos rendidos) ──
+    ejec_q = await db.execute(text("""
+        SELECT
+            er.rbd,
+            SUM(er.monto_declarado) AS total_ejecutado,
+            -- Desglose por cuenta padre
+            SUM(CASE WHEN er.cuenta_alias_padre LIKE '310100%'
+                     OR er.desc_cuenta_padre ILIKE '%subvenci%'
+                     THEN er.monto_declarado ELSE 0 END) AS ejecutado_subvenciones,
+            SUM(CASE WHEN er.cuenta_alias_padre LIKE '310700%'
+                     OR er.desc_cuenta_padre ILIKE '%fiscal%'
+                     THEN er.monto_declarado ELSE 0 END) AS ejecutado_otros_fiscales,
+            SUM(CASE WHEN er.cuenta_alias_padre LIKE '800%'
+                     OR er.desc_cuenta_padre ILIKE '%centralizado%'
+                     THEN er.monto_declarado ELSE 0 END) AS ejecutado_centralizado --,
+            -- SUM(CASE WHEN er.cuenta_alias_padre LIKE '500%'
+            --         OR er.desc_cuenta_padre ILIKE '%saldo%'
+            --         THEN er.monto_declarado ELSE 0 END) AS saldo_inicial
+        FROM estado_resultado er
+        WHERE er.sost_id = :sid
+          AND er.periodo = :agno
+          AND UPPER(TRIM(er.desc_tipo_cuenta)) = 'INGRESO'
+          AND UPPER(TRIM(er.desc_estado)) = 'RENDIDO'
+          AND er.monto_declarado > 0
+          AND (er.cuenta_alias_padre NOT LIKE '500%' OR er.cuenta_alias_padre IS NULL)
+        GROUP BY er.rbd
+    """), {"sid": sost_id, "agno": agno_usado})
+
+    ejecutado_por_rbd = {}
+    for r in ejec_q.mappings():
+        row = dict(r)
+        for k in ["total_ejecutado", "ejecutado_subvenciones",
+                  "ejecutado_otros_fiscales", "ejecutado_centralizado", "saldo_inicial"]:
+            if row.get(k) is not None:
+                row[k] = float(row[k])
+        ejecutado_por_rbd[row["rbd"]] = row
+
+    # ── 3. Construir tabla cruzada por RBD ────────────────────────────────────
+    all_rbds = set(proyectado_por_rbd.keys()) | set(ejecutado_por_rbd.keys())
+    por_rbd = []
+    for rbd in all_rbds:
+        proy = proyectado_por_rbd.get(rbd, {})
+        ejec = ejecutado_por_rbd.get(rbd, {})
+        proyectado = proy.get("total_proyectado") or 0
+        ejecutado = ejec.get("total_ejecutado") or 0
+        brecha = ejecutado - proyectado
+        pct = round(100.0 * ejecutado / proyectado, 1) if proyectado > 0 else None
+        por_rbd.append({
+            "rbd": rbd,
+            "nombre_rbd": proy.get("nombre_rbd") or f"RBD {rbd}",
+            "proyectado": proyectado,
+            "ejecutado": ejecutado,
+            "brecha": brecha,
+            "pct_cobertura": pct,
+            # Componentes proyectados
+            "sub_normal": proy.get("sub_normal") or 0,
+            "sep": (proy.get("sep_prio") or 0) + (proy.get("sep_pref") or 0),
+            "gratuidad": proy.get("apor_gratuidad") or 0,
+            "escolaridad_pie": proy.get("escolaridad_pie") or 0,
+            "sned": proy.get("sned") or 0,
+            "mantenimiento": proy.get("mantenimiento") or 0,
+            "zona": proy.get("monto_asig_zona") or 0,
+            "otros_proyectados": (
+                (proy.get("subv_asistentes_educacion") or 0) +
+                (proy.get("desempeno_dificil") or 0) +
+                (proy.get("desempeno_dificil_nodoc") or 0) +
+                (proy.get("subv_adicional_especial") or 0) +
+                (proy.get("profesor_encargado") or 0) +
+                (proy.get("internado") or 0) +
+                (proy.get("ruralidad") or 0) +
+                (proy.get("piso_rural") or 0)
+            ),
+            # Componentes ejecutados
+            "ejecutado_subvenciones": ejec.get("ejecutado_subvenciones") or 0,
+            "saldo_inicial": ejec.get("saldo_inicial") or 0,
+        })
+
+    por_rbd.sort(key=lambda x: x["proyectado"], reverse=True)
+
+    # ── 4. Desglose por componente de subvención (proyectado total) ───────────
+    COMPONENTES = [
+        ("Subv. Normal (SUB_NORMAL)",        sum(r.get("sub_normal", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("SEP Prioritarios",                 sum((r.get("sep_prio", 0) or 0) for r in proyectado_por_rbd.values())),
+        ("SEP Preferentes",                  sum((r.get("sep_pref", 0) or 0) for r in proyectado_por_rbd.values())),
+        ("Aporte Gratuidad",                 sum(r.get("apor_gratuidad", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Escolaridad PIE",                  sum(r.get("escolaridad_pie", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Asig. Zona",                       sum(r.get("monto_asig_zona", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Asist. Educación",                 sum(r.get("subv_asistentes_educacion", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("SNED",                             sum(r.get("sned", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Mantenimiento",                    sum(r.get("mantenimiento", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Desempeño Difícil",                sum((r.get("desempeno_dificil", 0) or 0) + (r.get("desempeno_dificil_nodoc", 0) or 0) for r in proyectado_por_rbd.values())),
+        ("Subv. Adicional Especial",         sum(r.get("subv_adicional_especial", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Profesor Encargado",               sum(r.get("profesor_encargado", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Internado",                        sum(r.get("internado", 0) or 0 for r in proyectado_por_rbd.values())),
+        ("Ruralidad / Piso Rural",           sum((r.get("ruralidad", 0) or 0) + (r.get("piso_rural", 0) or 0) for r in proyectado_por_rbd.values())),
+    ]
+    por_componente = [
+        {"componente": label, "monto_proyectado": float(monto)}
+        for label, monto in sorted(COMPONENTES, key=lambda x: x[1], reverse=True)
+        if monto > 0
+    ]
+
+    # ── 5. Desglose por cuenta padre (ejecutado) ──────────────────────────────
+    ejec_cuenta_q = await db.execute(text("""
+        SELECT
+            COALESCE(desc_cuenta_padre, 'Sin información') AS cuenta_padre,
+            SUM(monto_declarado) AS monto_ejecutado
+        FROM estado_resultado
+        WHERE sost_id = :sid
+          AND periodo = :agno
+          AND UPPER(TRIM(desc_tipo_cuenta)) = 'INGRESO'
+          AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+          AND monto_declarado > 0
+          AND (cuenta_alias_padre NOT LIKE '500%' OR cuenta_alias_padre IS NULL)
+        GROUP BY COALESCE(desc_cuenta_padre, 'Sin información')
+        ORDER BY monto_ejecutado DESC
+    """), {"sid": sost_id, "agno": agno_usado})
+
+    por_cuenta_er = []
+    for r in ejec_cuenta_q.mappings():
+        row = dict(r)
+        if row.get("monto_ejecutado") is not None:
+            row["monto_ejecutado"] = float(row["monto_ejecutado"])
+        por_cuenta_er.append(row)
+
+    # ── 6. Evolución mensual del proyectado ───────────────────────────────────
+    mensual_q = await db.execute(text("""
+        SELECT
+            mes,
+            SUM(
+                sub_normal + escolaridad_pie + monto_asig_zona +
+                subv_asistentes_educacion + sned + mantenimiento +
+                apor_gratuidad + sep_prio + sep_pref +
+                desempeno_dificil + desempeno_dificil_nodoc +
+                subv_adicional_especial + profesor_encargado +
+                internado + ruralidad + piso_rural
+            ) AS proyectado_mes,
+            SUM(sub_normal)              AS sub_normal_mes,
+            SUM(sep_prio + sep_pref)     AS sep_mes,
+            SUM(apor_gratuidad)          AS gratuidad_mes
+        FROM dim_monto_subvencion
+        WHERE rut_sostenedor = :sid AND agno = :agno
+        GROUP BY mes
+        ORDER BY mes
+    """), {"sid": sost_id, "agno": agno_usado})
+
+    mensual = []
+    for r in mensual_q.mappings():
+        row = dict(r)
+        for k in ["proyectado_mes", "sub_normal_mes", "sep_mes", "gratuidad_mes"]:
+            if row.get(k) is not None:
+                row[k] = float(row[k])
+        mensual.append(row)
+
+    # ── 7. KPIs totales ───────────────────────────────────────────────────────
+    total_proyectado = sum(r["proyectado"] for r in por_rbd)
+    total_ejecutado  = sum(r["ejecutado"]  for r in por_rbd)
+    brecha_total     = total_ejecutado - total_proyectado
+    pct_cobertura    = round(100.0 * total_ejecutado / total_proyectado, 1) if total_proyectado > 0 else None
+    n_rbds_proyect   = len(proyectado_por_rbd)
+    n_rbds_ejecut    = len(ejecutado_por_rbd)
+    n_rbds_ambos     = len(set(proyectado_por_rbd.keys()) & set(ejecutado_por_rbd.keys()))
+
+    return {
+        "kpis": {
+            "total_proyectado":  total_proyectado,
+            "total_ejecutado":   total_ejecutado,
+            "brecha":            brecha_total,
+            "pct_cobertura":     pct_cobertura,
+            "n_rbds_proyectados": n_rbds_proyect,
+            "n_rbds_ejecutados":  n_rbds_ejecut,
+            "n_rbds_cruzados":    n_rbds_ambos,
+        },
+        "por_rbd":          por_rbd,
+        "por_componente":   por_componente,
+        "por_cuenta_er":    por_cuenta_er,
+        "mensual":          mensual,
+        "agno_usado":       agno_usado,
+        "agno_disponibles": agno_disponibles,
+    }

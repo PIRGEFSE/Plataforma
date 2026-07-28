@@ -3,7 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto } from '../../lib/format'
 
-const COLORS = ['#6366f1','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#84cc16']
+const COLORS = ['#2563eb','#059669','#d97706','#0ea5e9','#dc2626','#7c3aed','#0891b2','#ca8a04','#047857','#1d4ed8']
 
 export default function Subvencion() {
   const [data, setData] = useState([])

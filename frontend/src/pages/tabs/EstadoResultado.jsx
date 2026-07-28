@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto } from '../../lib/format'
+import { useChartColors } from '../../hooks/useChartColors'
 
-const COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899']
+const COLORS = ['#2563eb','#059669','#d97706','#dc2626','#7c3aed','#0ea5e9','#0891b2','#ca8a04']
 
 export default function EstadoResultado() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [periodo, setPeriodo] = useState('')
   const [periodos, setPeriodos] = useState([])
+  const C = useChartColors()
+
 
   useEffect(() => { api.get('/dashboard/filtros/periodos').then(r => setPeriodos(r.data)) }, [])
   useEffect(() => {
@@ -40,10 +43,10 @@ export default function EstadoResultado() {
       },
       backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#f1f5f9' },
     },
-    legend: { data: tipos, textStyle: { color: '#94a3b8' }, top: 0, type: 'scroll' },
+    legend: { data: tipos, textStyle: { color: C.axisLabel }, top: 0, type: 'scroll' },
     grid: { left: 110, right: 20, top: 80, bottom: 40 },
-    xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
-    yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    xAxis: { type: 'category', data: anios, axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: seriesData,
     backgroundColor: 'transparent',
   }

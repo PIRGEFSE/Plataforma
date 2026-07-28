@@ -5,9 +5,9 @@ import { fmtMoneda, fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 
 // Semáforo para el % de innovación pedagógica sobre el gasto total
 function innovSemaforo(pct) {
-  if (pct >= 5)  return { color: '#10b981', label: 'Destacado', icon: '🟢' }
-  if (pct >= 2)  return { color: '#f59e0b', label: 'Moderado',  icon: '🟡' }
-  return           { color: '#ef4444', label: 'Bajo',      icon: '🔴' }
+  if (pct >= 5)  return { color: '#059669', label: 'Destacado', icon: '🟢' }
+  if (pct >= 2)  return { color: '#d97706', label: 'Moderado',  icon: '🟡' }
+  return           { color: '#dc2626', label: 'Bajo',      icon: '🔴' }
 }
 
 function KPICard({ label, value, icon, color, sub, badge }) {
@@ -65,14 +65,14 @@ export default function InnovacionPedagogica({ periodos, periodo }) {
         name: '% s/ Gasto Total',
         type: 'bar', barGap: '5%', barMaxWidth: 45,
         data: data.serie.map(d => Number(d.pct_innovacion_total)),
-        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#6366f1' }, { offset: 1, color: '#4338ca' }] } },
+        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#2563eb' }, { offset: 1, color: '#1e40af' }] } },
         label: { show: true, position: 'top', color: '#94a3b8', formatter: p => `${Number(p.value).toFixed(1)}%` },
       },
       {
         name: '% s/ Gasto No Remuneracional',
         type: 'bar', barMaxWidth: 45,
         data: data.serie.map(d => Number(d.pct_innovacion_no_rem)),
-        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#10b981' }, { offset: 1, color: '#059669' }] } },
+        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#059669' }, { offset: 1, color: '#047857' }] } },
         label: { show: true, position: 'top', color: '#94a3b8', formatter: p => `${Number(p.value).toFixed(1)}%` },
       },
     ],
@@ -91,9 +91,9 @@ export default function InnovacionPedagogica({ periodos, periodo }) {
     xAxis: { type: 'category', data: anios, axisLabel: { color: '#94a3b8' }, axisLine: { lineStyle: { color: '#334155' } } },
     yAxis: { type: 'value', axisLabel: { color: '#94a3b8', formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: '#1e293b' } } },
     series: [
-      { name: 'Innovación Pedagógica',    type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => d.monto_innovacion),                                     itemStyle: { color: '#6366f1' } },
-      { name: 'Gasto No Rem. Otro',       type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => Math.max(0, d.gasto_no_remuneracional - d.monto_innovacion)), itemStyle: { color: '#06b6d4' } },
-      { name: 'Gasto Remuneracional',     type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => d.gasto_remuneracional),                                  itemStyle: { color: '#94a3b8' } },
+      { name: 'Innovación Pedagógica',    type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => d.monto_innovacion),                                     itemStyle: { color: '#2563eb' } },
+      { name: 'Gasto No Rem. Otro',       type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => Math.max(0, d.gasto_no_remuneracional - d.monto_innovacion)), itemStyle: { color: '#0ea5e9' } },
+      { name: 'Gasto Remuneracional',     type: 'bar', stack: 'g', barMaxWidth: 60, data: data.serie.map(d => d.gasto_remuneracional),                                  itemStyle: { color: '#64748b' } },
     ],
     backgroundColor: 'transparent',
   }
@@ -114,7 +114,7 @@ export default function InnovacionPedagogica({ periodos, periodo }) {
           label="% Innovación / Gasto No Remuneracional"
           value={`${data.pct_sobre_no_rem.toFixed(2)}%`}
           icon="🎯"
-          color="#6366f1"
+          color="#2563eb"
           sub={`No rem.: ${fmtMM(data.total_no_rem)}`}
           badge="No Rem."
         />
@@ -177,11 +177,11 @@ export default function InnovacionPedagogica({ periodos, periodo }) {
                 <tr><td colSpan={5} style={{ textAlign: 'center', color: '#64748b' }}>Sin datos de cuentas de innovación</td></tr>
               ) : data.detalle_innovacion.map(d => (
                 <tr key={d.cuenta_alias}>
-                  <td><code style={{ color: '#6366f1' }}>{d.cuenta_alias}</code></td>
+                  <td><code style={{ color: '#2563eb' }}>{d.cuenta_alias}</code></td>
                   <td>{CUENTA_LABEL[d.cuenta_alias] ?? d.cuenta_alias}</td>
                   <td>{fmtMM(d.monto_total)}</td>
                   <td>
-                    <strong style={{ color: '#6366f1' }}>
+                    <strong style={{ color: '#2563eb' }}>
                       {data.total_gasto > 0 ? `${(Number(d.monto_total) / data.total_gasto * 100).toFixed(3)}%` : '—'}
                     </strong>
                   </td>

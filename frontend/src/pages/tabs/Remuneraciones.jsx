@@ -31,9 +31,9 @@ export default function Remuneraciones() {
     xAxis: { type: 'category', data: data.por_anio.map(d => d.anio), axisLabel: { color: C.axisLabel }, axisLine: { lineStyle: { color: C.axisLine } } },
     yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtMonedaCorto(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
     series: [
-      { name: 'Promedio Líquido', type: 'bar', data: data.por_anio.map(d => d.promedio_liquido), itemStyle: { color: '#10b981' }, barGap: '5%', barMaxWidth: 40 },
-      { name: 'Promedio Haber', type: 'bar', data: data.por_anio.map(d => d.promedio_haber), itemStyle: { color: '#6366f1' }, barMaxWidth: 40 },
-      { name: 'Promedio Descuento', type: 'bar', data: data.por_anio.map(d => d.promedio_descuento), itemStyle: { color: '#ef4444' }, barMaxWidth: 40 },
+      { name: 'Promedio Líquido',   type: 'bar', data: data.por_anio.map(d => d.promedio_liquido),   itemStyle: { color: '#059669' }, barGap: '5%', barMaxWidth: 40 },
+      { name: 'Promedio Haber',     type: 'bar', data: data.por_anio.map(d => d.promedio_haber),     itemStyle: { color: '#2563eb' }, barMaxWidth: 40 },
+      { name: 'Promedio Descuento', type: 'bar', data: data.por_anio.map(d => d.promedio_descuento), itemStyle: { color: '#dc2626' }, barMaxWidth: 40 },
     ],
     backgroundColor: 'transparent',
   }

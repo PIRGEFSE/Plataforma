@@ -152,7 +152,7 @@ function NavGroup({ group, sidebarOpen, navigate, isActive, currentPath }) {
   return (
     <div className="nav-group">
       <button
-        className={`nav-group-header${isActive ? ' active' : ''}`}
+        className={`nav-group-header${(!hasChildren && isActive) ? ' active' : ''}`}
         onClick={handleGroupClick}
         title={group.label}
       >
@@ -268,7 +268,6 @@ export default function Dashboard() {
         </nav>
 
         <div className="sidebar-footer">
-          <ThemeToggle variant="sidebar" collapsed={!sidebarOpen} />
           <div className="user-info">
             <div className="user-avatar">{user?.username?.[0]?.toUpperCase()}</div>
             {sidebarOpen && (
@@ -283,6 +282,9 @@ export default function Dashboard() {
           </button>
         </div>
       </aside>
+
+      {/* Theme Switch (Top Right) */}
+      <ThemeToggle variant="switch" />
 
       {/* Main content */}
       <main className="main-content">
@@ -311,6 +313,7 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/sostenibilidad-riesgo" element={<FichaSostenedor section="sostenibilidad_riesgo" />} />
                 <Route path="/mi-ficha/comportamiento-financiero" element={<FichaSostenedor section="comportamiento_financiero" />} />
                 <Route path="/mi-ficha/territorio" element={<FichaSostenedor section="territorio" />} />
+                <Route path="/mi-ficha/presupuesto" element={<FichaSostenedor section="presupuesto" />} />
                 <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
               </>
             )}

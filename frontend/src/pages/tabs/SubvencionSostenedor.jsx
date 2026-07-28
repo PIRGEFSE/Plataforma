@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { fmtMM, fmtMonedaCorto } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 
-const COLORS = ['#6366f1','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#84cc16']
+const COLORS = ['#2563eb','#059669','#d97706','#0ea5e9','#dc2626','#7c3aed','#0891b2','#ca8a04','#047857','#1d4ed8']
 
 export default function SubvencionSostenedor() {
   const { user } = useAuth()
@@ -37,7 +37,7 @@ export default function SubvencionSostenedor() {
     legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: C.legend.color }, formatter: n => n.length > 20 ? n.slice(0, 20) + '...' : n },
     series: [{
       type: 'pie', radius: ['40%', '70%'], center: ['40%', '50%'],
-      data: data.map((d, i) => ({ name: d.subvencion_alias || 'Sin subvención', value: d.monto_total, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      data: data.map((d, i) => ({ name: d.subvencion_alias || 'Sin subvención', value: d.monto_total, itemStyle: C.getPieItemStyle(i) })),
       label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' } },
     }],
     backgroundColor: 'transparent',
@@ -54,7 +54,7 @@ export default function SubvencionSostenedor() {
     yAxis: { type: 'category', data: [...data].reverse().map(d => d.subvencion_alias || 'Sin subvención'), axisLabel: { color: C.axisLabel, width: 120, overflow: 'truncate' }, axisLine: { lineStyle: { color: C.axisLine } } },
     series: [{
       type: 'bar',
-      data: [...data].reverse().map((d, i) => ({ value: d.monto_total, itemStyle: { color: COLORS[i % COLORS.length] } })),
+      data: [...data].reverse().map((d, i) => ({ value: d.monto_total, itemStyle: C.getBarItemStyle(i, { borderRadius: [0, 4, 4, 0] }) })),
       barMaxWidth: 30,
       label: { show: true, position: 'right', color: C.axisLabel, formatter: p => fmtMM(p.value) },
     }],

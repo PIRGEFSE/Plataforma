@@ -122,9 +122,9 @@ export default function GastoRemIngreso({ periodo }) {
           ? rows.reduce((s, r) => s + Number(r.avg_ratio || 0) * r.n_sostenedores / tot, 0)
           : null
       }),
-      lineStyle: { color: '#6366f1', width: 3 },
-      itemStyle: { color: '#6366f1' },
-      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#6366f140' }, { offset: 1, color: 'transparent' }] } },
+      lineStyle: { color: '#2563eb', width: 3 },
+      itemStyle: { color: '#2563eb' },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#2563eb38' }, { offset: 1, color: 'transparent' }] } },
       markLine: {
         silent: true,
         data: [
@@ -153,13 +153,13 @@ export default function GastoRemIngreso({ periodo }) {
       {
         name: 'Gasto Remuneracional', type: 'bar', barGap: '5%', barMaxWidth: 50,
         data: anios.map(a => { const rows = data.por_nivel.filter(d => d.periodo === a); return rows.reduce((s, r) => s + Number(r.total_gasto_rem || 0), 0) }),
-        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#ef4444' }, { offset: 1, color: '#991b1b' }] } },
+        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#dc2626' }, { offset: 1, color: '#991b1b' }] } },
         label: { show: true, position: 'top', formatter: p => fmtMM(p.value), color: '#94a3b8', fontSize: 10 },
       },
       {
         name: 'Ingreso Depurado', type: 'bar', barMaxWidth: 50,
         data: anios.map(a => { const rows = data.por_nivel.filter(d => d.periodo === a); return rows.reduce((s, r) => s + Number(r.total_ingreso || 0), 0) }),
-        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#6366f1' }, { offset: 1, color: '#4338ca' }] } },
+        itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#2563eb' }, { offset: 1, color: '#1e40af' }] } },
         label: { show: true, position: 'top', formatter: p => fmtMM(p.value), color: '#94a3b8', fontSize: 10 },
       },
     ],
@@ -182,8 +182,8 @@ export default function GastoRemIngreso({ periodo }) {
       <div className="kpi-grid">
         <KPICard label="Ratio Gasto Rem / Ingreso" value={`${data.ratio_global.toFixed(1)}%`} icon={rl.icon} color={rl.color} sub={`Promedio sostenedores: ${data.avg_ratio.toFixed(1)}%`} badge={rl.label} />
         <KPICard label="Sostenedores en Riesgo Alto/Crítico" value={fmtN(data.sost_alto_crit)} icon="🔴" color="#ef4444" sub={`de ${fmtN(data.total_sost)} sostenedores analizados`} badge="Alta Vigilancia" />
-        <KPICard label="Total Gasto Remuneracional" value={fmtMM(data.total_rem)} icon="👥" color="#ef4444" sub="Nómina según cuentas 2024 (ref.)" badge="Nómina" />
-        <KPICard label="Total Ingreso Depurado" value={fmtMM(data.total_ingreso)} icon="💰" color="#6366f1" sub="Ingresos rendidos en estado_resultado" badge="Ingreso" />
+        <KPICard label="Total Gasto Remuneracional" value={fmtMM(data.total_rem)} icon="👥" color="#3b82f6" sub="Nómina según cuentas 2024 (ref.)" badge="Nómina" />
+        <KPICard label="Total Ingreso Depurado" value={fmtMM(data.total_ingreso)} icon="💰" color="#1e40af" sub="Ingresos rendidos en estado_resultado" badge="Ingreso" />
       </div>
 
       {/* Gráficos */}
@@ -224,7 +224,7 @@ export default function GastoRemIngreso({ periodo }) {
                   <tr key={`${d.sost_id}-${i}`}>
                     <td><code>{d.sost_id}</code></td>
                     <td>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${col}20`, color: col, padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: col, fontSize: '0.8rem', fontWeight: 600 }}>
                         {RIESGO_ICON[d.nivel_riesgo]} {d.nivel_riesgo}
                       </span>
                     </td>
