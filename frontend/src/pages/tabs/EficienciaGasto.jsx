@@ -11,18 +11,19 @@ const SUB_TABS = [
   { id: 'innovacion',    label: '% Gasto en Innovación Pedagógica',        icon: '🎓' },
 ]
 
-// Paleta fija para las 3 categorías de concentración
+// Paleta fija para las 3 categorías de concentración — alta diferenciación para daltonismo
 const CAT_COLORS = {
-  'Gasto en Aula':         '#10b981',
-  'Gasto Administrativo':  '#ef4444',
-  'Otros Gastos':          '#f59e0b',
+  'Gasto en Aula': '#1d4ed8',
+  'Gasto Administrativo': '#3b82f6',
+  'Innovación Pedagógica': '#60a5fa',
+  'Otros Gastos': '#93c5fd',
 }
 const CATEGORIAS = ['Gasto en Aula', 'Gasto Administrativo', 'Otros Gastos']
 
 function concSemaforo(pct) {
-  if (pct <= 15) return { color: '#10b981', label: 'Óptimo', icon: '🟢' }
-  if (pct <= 25) return { color: '#f59e0b', label: 'Moderado', icon: '🟡' }
-  return { color: '#ef4444', label: 'Elevado', icon: '🔴' }
+  if (pct <= 15) return { color: '#059669', label: 'Óptimo',   icon: '🟢' }
+  if (pct <= 25) return { color: '#d97706', label: 'Moderado', icon: '🟡' }
+  return             { color: '#dc2626', label: 'Elevado',  icon: '🔴' }
 }
 
 function KPICard({ label, value, icon, color, sub, badge }) {
@@ -127,9 +128,9 @@ function ConcentracionGasto({ periodo }) {
     <>
       <div className="kpi-grid">
         <KPICard label="Gasto Administrativo (411xx)" value={`${data.concentracion_admin.toFixed(1)}%`} icon={semaforo.icon} color={semaforo.color} sub={fmtMoneda(data.monto_admin)} badge={semaforo.label} />
-        <KPICard label="Gasto en Aula (410xx)" value={`${data.total_gasto > 0 ? (data.monto_aula / data.total_gasto * 100).toFixed(1) : 0}%`} icon="📚" color="#10b981" sub={fmtMoneda(data.monto_aula)} badge="Aula" />
-        <KPICard label="Otros Gastos (700xx)" value={`${data.total_gasto > 0 ? (data.monto_otros / data.total_gasto * 100).toFixed(1) : 0}%`} icon="📦" color="#f59e0b" sub={fmtMoneda(data.monto_otros)} badge="Otros" />
-        <KPICard label="Ratio Aula / Administración" value={data.ratio_aula_admin != null ? `${data.ratio_aula_admin.toFixed(2)}x` : '—'} icon="⚖️" color="#6366f1" sub="Por cada peso en admin., cuántos van al aula" badge={data.ratio_aula_admin > 2 ? 'Favorable' : data.ratio_aula_admin > 1 ? 'Moderado' : 'Crítico'} />
+        <KPICard label="Gasto en Aula (410xx)" value={`${data.total_gasto > 0 ? (data.monto_aula / data.total_gasto * 100).toFixed(1) : 0}%`} icon="📚" color="#1d4ed8" sub={fmtMoneda(data.monto_aula)} badge="Aula" />
+        <KPICard label="Otros Gastos (700xx)" value={`${data.total_gasto > 0 ? (data.monto_otros / data.total_gasto * 100).toFixed(1) : 0}%`} icon="📦" color="#93c5fd" sub={fmtMoneda(data.monto_otros)} badge="Otros" />
+        <KPICard label="Ratio Aula / Administración" value={data.ratio_aula_admin != null ? `${data.ratio_aula_admin.toFixed(2)}x` : '—'} icon="⚖️" color="#2563eb" sub="Por cada peso en admin., cuántos van al aula" badge={data.ratio_aula_admin > 2 ? 'Favorable' : data.ratio_aula_admin > 1 ? 'Moderado' : 'Crítico'} />
       </div>
       <div className="charts-grid-2">
         <div className="chart-card"><h3 className="chart-title">Distribución del Gasto por Categoría</h3><ReactECharts option={pieOption} style={{ height: 360 }} /></div>

@@ -124,12 +124,12 @@ export default function Resumen() {
       data: yValues,
       smooth: true,
       symbol: 'none',
-      lineStyle: { color: '#6366f1', width: 2 },
+      lineStyle: { color: '#2563eb', width: 2 },
       areaStyle: {
         color: {
           type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: '#6366f144' },
+            { offset: 0, color: '#2563eb44' },
             { offset: 1, color: 'transparent' },
           ],
         },
@@ -178,28 +178,28 @@ export default function Resumen() {
               label="Monto Total Documentos"
               value={fmtMoneda(data.monto_total_documentos)}
               icon="💵"
-              color="#6366f1"
+              color="#2563eb"
               sub={`${fmtN(data.n_documentos)} documentos registrados`}
             />
             <KPICard
               label="Establecimientos Activos"
               value={fmtN(data.n_establecimientos)}
               icon="🏫"
-              color="#10b981"
+              color="#1d4ed8"
               sub={`${fmtN(data.n_sostenedores)} sostenedores`}
             />
             <KPICard
               label="Total Remuneraciones Líquidas"
               value={fmtMoneda(data.total_liquido_remuneraciones)}
               icon="💰"
-              color="#f59e0b"
+              color="#3b82f6"
               sub={`${fmtN(data.n_funcionarios)} funcionarios`}
             />
             <KPICard
               label="Registros de Remuneraciones"
               value={fmtN(data.n_remuneraciones)}
               icon="📋"
-              color="#8b5cf6"
+              color="#60a5fa"
               sub={periodo ? `Año ${periodo}` : 'Acumulado 2020-2024'}
             />
           </div>

@@ -16,27 +16,27 @@ const HHI_ICON = {
 }
 const NIVELES = ['Concentración Baja', 'Concentración Moderada', 'Concentración Alta']
 
-// Colores para las fuentes de ingreso (los más comunes tienen color fijo)
+// Colores para las fuentes de ingreso — paleta azul accesible para daltonismo
 const FUENTE_COLOR = {
-  GENERAL:       '#6366f1',
-  SEP:           '#10b981',
-  PIE:           '#f59e0b',
-  ACG:           '#06b6d4',
-  MANTENIMIENTO: '#8b5cf6',
-  PRORETENCION:  '#ec4899',
-  INTERNADO:     '#14b8a6',
-  AC:            '#f97316',
+  GENERAL:       '#2563eb',
+  SEP:           '#059669',
+  PIE:           '#d97706',
+  ACG:           '#0ea5e9',
+  MANTENIMIENTO: '#7c3aed',
+  PRORETENCION:  '#dc2626',
+  INTERNADO:     '#0891b2',
+  AC:            '#ca8a04',
 }
-const FUENTE_COLOR_DEFAULT = ['#84cc16','#a78bfa','#fb923c','#38bdf8','#fb7185']
+const FUENTE_COLOR_DEFAULT = ['#6ee7b7', '#93c5fd', '#fcd34d', '#c4b5fd', '#fca5a5']
 
 function getFuenteColor(alias, idx) {
   return FUENTE_COLOR[alias] ?? FUENTE_COLOR_DEFAULT[idx % FUENTE_COLOR_DEFAULT.length]
 }
 
 function hHILabel(hhi) {
-  if (hhi < 1500) return { label: 'Bajo', color: '#10b981', icon: '🟢' }
-  if (hhi < 2500) return { label: 'Moderado', color: '#f59e0b', icon: '🟡' }
-  return { label: 'Alto', color: '#ef4444', icon: '🔴' }
+  if (hhi < 1500) return { label: 'Bajo',     color: '#059669', icon: '🟢' }
+  if (hhi < 2500) return { label: 'Moderado', color: '#d97706', icon: '🟡' }
+  return             { label: 'Alto',     color: '#dc2626', icon: '🔴' }
 }
 
 function KPICard({ label, value, icon, color, sub, badge }) {
@@ -144,9 +144,9 @@ export default function HHIFuentes({ periodo }) {
         return totalSost > 0 ? wmAvg : null
       }),
       smooth: true, symbol: 'circle', symbolSize: 8,
-      lineStyle: { color: '#6366f1', width: 3 },
-      itemStyle: { color: '#6366f1' },
-      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#6366f140' }, { offset: 1, color: 'transparent' }] } },
+      lineStyle: { color: '#2563eb', width: 3 },
+      itemStyle: { color: '#2563eb' },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#2563eb38' }, { offset: 1, color: 'transparent' }] } },
       markLine: {
         silent: true,
         data: [
@@ -183,7 +183,7 @@ export default function HHIFuentes({ periodo }) {
           label="Total Sostenedores Analizados"
           value={fmtN(data.total_sost)}
           icon="🏢"
-          color="#6366f1"
+          color="#2563eb"
           sub="Sostenedores con ingresos rendidos registrados"
           badge="Universo"
         />
@@ -279,7 +279,7 @@ export default function HHIFuentes({ periodo }) {
                       <strong style={{ color: col, fontSize: '1rem' }}>{fmtN(Math.round(Number(d.hhi)))}</strong>
                     </td>
                     <td>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${col}20`, color: col, padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: col, fontSize: '0.8rem', fontWeight: 600 }}>
                         {HHI_ICON[d.nivel_concentracion]} {d.nivel_concentracion}
                       </span>
                     </td>

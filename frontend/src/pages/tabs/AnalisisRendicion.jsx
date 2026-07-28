@@ -16,10 +16,7 @@ const MESES_FULL = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
 
-const PALETTE = [
-  '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#14b8a6',
-]
+// PALETTE importada de useChartColors (vía hook, ver más abajo en el componente)
 
 const ITEMS_PER_PAGE = 15
 
@@ -170,7 +167,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
     },
     series: [{
       type: 'bar', data: serieData, barMaxWidth: 40,
-      itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] },
+      itemStyle: C.getBarItemStyle(0, { borderRadius: [4, 4, 0, 0] }),
       label: {
         show: true, position: 'top',
         formatter: p => p.value > 0 ? fmtAxisAmt(p.value) : '',
@@ -196,7 +193,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       data: por_cuenta_padre.map((c, i) => ({
         name: c.desc_cuenta_padre,
         value: c.total_monto,
-        itemStyle: { color: PALETTE[i % PALETTE.length] },
+        itemStyle: C.getPieItemStyle(i),
       })),
       label: { show: false },
       emphasis: { label: { show: false } },
@@ -230,7 +227,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       type: 'bar', barMaxWidth: 20,
       data: subvRev.map((d, i) => ({
         value: d.total_monto,
-        itemStyle: { color: PALETTE[i % PALETTE.length], borderRadius: [0, 4, 4, 0] },
+        itemStyle: C.getBarItemStyle(i, { borderRadius: [0, 4, 4, 0] }),
       })),
       label: {
         show: true, position: 'right',
@@ -271,7 +268,7 @@ export default function AnalisisRendicion({ sostId, periodo }) {
       type: 'bar', barMaxWidth: 20,
       data: tipoRev.map((d, i) => ({
         value: d.total_monto,
-        itemStyle: { color: PALETTE[(i + 3) % PALETTE.length], borderRadius: [0, 4, 4, 0] },
+        itemStyle: C.getBarItemStyle(i + 3, { borderRadius: [0, 4, 4, 0] }),
       })),
       label: {
         show: true, position: 'right',
@@ -349,10 +346,10 @@ ORDER BY monto_declarado DESC`
 
       {/* ── KPIs ────────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-        <KPICard icon="💰" label={`Monto Total (${unitLabel})`} value={fmtAmt(resumen.total_monto)} color="#6366f1" sub={`Año ${periodo}${mes ? ` · ${MESES_FULL[mes]}` : ''}`} />
-        <KPICard icon="📄" label="N° Documentos" value={fmtN(resumen.total_docs)} color="#10b981" sub="Registros contabilizados" />
-        <KPICard icon="🏫" label="Establecimientos (RBD)" value={fmtN(resumen.n_rbd)} color="#f59e0b" sub="Con documentos en el período" />
-        <KPICard icon="📊" label="Categorías de Cuenta" value={fmtN(por_cuenta_padre.length)} color="#8b5cf6" sub="Cuentas padre distintas" />
+        <KPICard icon="💰" label={`Monto Total (${unitLabel})`} value={fmtAmt(resumen.total_monto)} color="#1e40af" sub={`Año ${periodo}${mes ? ` · ${MESES_FULL[mes]}` : ''}`} />
+        <KPICard icon="📄" label="N° Documentos" value={fmtN(resumen.total_docs)} color="#3b82f6" sub="Registros contabilizados" />
+        <KPICard icon="🏫" label="Establecimientos (RBD)" value={fmtN(resumen.n_rbd)} color="#60a5fa" sub="Con documentos en el período" />
+        <KPICard icon="📊" label="Categorías de Cuenta" value={fmtN(por_cuenta_padre.length)} color="#2563eb" sub="Cuentas padre distintas" />
       </div>
 
       {/* ── Filtro de mes ───────────────────────────────────────────── 
@@ -498,13 +495,13 @@ ORDER BY monto_declarado DESC`
                   </td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.desc_libro}>{d.desc_libro}</td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.desc_cuenta_padre}>
-                    <span style={{ fontSize: '0.72rem', background: '#6366f120', color: '#818cf8', borderRadius: 4, padding: '1px 6px' }}>{d.desc_cuenta_padre}</span>
+                    <span style={{ fontSize: '0.72rem', background: '#2563eb20', color: '#93c5fd', borderRadius: 4, padding: '1px 6px' }}>{d.desc_cuenta_padre}</span>
                   </td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }} title={d.desc_cuenta}>{d.desc_cuenta}</td>
-                  <td style={{ padding: '0.4rem 0.75rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#10b981', fontSize: '0.72rem', fontWeight: 600 }} title={d.subvencion_alias}>{d.subvencion_alias}</td>
+                  <td style={{ padding: '0.4rem 0.75rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#059669', fontSize: '0.72rem', fontWeight: 600 }} title={d.subvencion_alias}>{d.subvencion_alias}</td>
                   <td style={{ padding: '0.4rem 0.75rem', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' }} title={getNombreDoc(d.tipo_docs_alias)}>{getNombreDoc(d.tipo_docs_alias)}</td>
                   <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{fmtN(d.n_docs)}</td>
-                  <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#6366f1', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(d.monto_declarado)}</td>
+                  <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>{fmtAmt(d.monto_declarado)}</td>
                 </tr>
               ))}
             </tbody>

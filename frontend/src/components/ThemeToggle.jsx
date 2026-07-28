@@ -52,6 +52,18 @@ export default function ThemeToggle({ variant = 'fixed', collapsed = false }) {
     )
   }
 
+  if (variant === 'switch') {
+    return (
+      <button className="theme-switch" onClick={toggleTheme} title={title} aria-label={title}>
+        <div className={`theme-switch-track ${isDark ? 'dark' : 'light'}`}>
+          <div className="theme-switch-thumb">
+            {isDark ? <MoonIcon /> : <SunIcon />}
+          </div>
+        </div>
+      </button>
+    )
+  }
+
   // variant="fixed" — Login
   return (
     <button

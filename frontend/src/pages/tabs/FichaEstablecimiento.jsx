@@ -5,11 +5,11 @@ import { useAuth } from '../../hooks/useAuth'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 
-const RIESGO_COLORS = { 'Riesgo Bajo': '#10b981', 'Riesgo Moderado': '#f59e0b', 'Riesgo Alto': '#ef4444' }
-const EF_COLORS = { Optimo: '#10b981', Moderado: '#f59e0b', Elevado: '#ef4444' }
-const COLORS = ['#6366f1','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#84cc16']
+const RIESGO_COLORS = { 'Riesgo Bajo': '#059669', 'Riesgo Moderado': '#d97706', 'Riesgo Alto': '#dc2626' }
+const EF_COLORS = { Optimo: '#059669', Moderado: '#d97706', Elevado: '#dc2626' }
+const COLORS = ['#2563eb','#059669','#d97706','#0ea5e9','#dc2626','#7c3aed','#0891b2','#ca8a04','#047857','#1d4ed8']
 const ESTADO_LABELS = { 1: 'Funcionando', 2: 'Receso', 3: 'Cerrado' }
-const ESTADO_COLORS = { 1: '#10b981', 2: '#f59e0b', 3: '#64748b' }
+const ESTADO_COLORS = { 1: '#059669', 2: '#d97706', 3: '#64748b' }
 
 const ENS_MAP = {
   10:{label:'Parvularia',color:'#f472b6'},110:{label:'Básica',color:'#60a5fa'},
@@ -21,7 +21,7 @@ const ENS_MAP = {
 
 // tt() se llama dentro de componentes que usan useChartColors — ver uso abajo
 
-function KPICard({ icon, label, value, color='#6366f1', sub }) {
+function KPICard({ icon, label, value, color='#2563eb', sub }) {
   return (
     <div className="kpi-card" style={{'--accent':color}}>
       <div className="kpi-icon" style={{background:`${color}20`}}>{icon}</div>
@@ -138,10 +138,10 @@ function TabPerfil({ perfil, detalleData }) {
   return (
     <>
       <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#6366f1"/>
-        <KPICard icon="📈" label="Último Ingreso" value={finUlt ? fmtMM(finUlt.ingreso) : '—'} color="#10b981" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
-        <KPICard icon="📉" label="Último Gasto" value={finUlt ? fmtMM(finUlt.gasto) : '—'} color="#ef4444" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
-        <KPICard icon="⚖️" label="Superávit" value={finUlt ? fmtMM(finUlt.superavit) : '—'} color={finUlt && finUlt.superavit>=0 ? '#10b981':'#ef4444'}/>
+        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#1d4ed8"/>
+        <KPICard icon="📈" label="Último Ingreso" value={finUlt ? fmtMM(finUlt.ingreso) : '—'} color="#1e40af" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
+        <KPICard icon="📉" label="Último Gasto" value={finUlt ? fmtMM(finUlt.gasto) : '—'} color="#3b82f6" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
+        <KPICard icon="⚖️" label="Superávit" value={finUlt ? fmtMM(finUlt.superavit) : '—'} color={finUlt && finUlt.superavit>=0 ? '#059669':'#dc2626'}/>
       </div>
       <div className="chart-card" style={{marginBottom:'1.5rem'}}>
         <h3 className="chart-title">Datos del Establecimiento</h3>
@@ -221,8 +221,8 @@ function TabFinanciero({ detalleData }) {
     xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
     yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[
-      { name:'Ingreso', type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.ingreso)), itemStyle:{color:'#10b981',borderRadius:[4,4,0,0]} },
-      { name:'Gasto',   type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.gasto)),   itemStyle:{color:'#ef4444',borderRadius:[4,4,0,0]} },
+      { name:'Ingreso', type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.ingreso)), itemStyle:{color:'#059669',borderRadius:[4,4,0,0]} },
+      { name:'Gasto',   type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.gasto)),   itemStyle:{color:'#dc2626',borderRadius:[4,4,0,0]} },
     ],
     backgroundColor:'transparent',
   }
@@ -233,7 +233,7 @@ function TabFinanciero({ detalleData }) {
     xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
     yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[{ type:'bar', barMaxWidth:40,
-      data:financiero_serie.map(d=>({ value:Number(d.superavit), itemStyle:{color:Number(d.superavit)>=0?'#10b981':'#ef4444',borderRadius:[4,4,0,0]} })),
+      data:financiero_serie.map(d=>({ value:Number(d.superavit), itemStyle:{color:Number(d.superavit)>=0?'#059669':'#dc2626',borderRadius:[4,4,0,0]} })),
       markLine:{ silent:true, data:[{xAxis:0,lineStyle:{color:'#475569',type:'dashed'}}] },
     }],
     backgroundColor:'transparent',
@@ -244,8 +244,8 @@ function TabFinanciero({ detalleData }) {
     grid:{ left:80, right:30, top:20, bottom:30 },
     xAxis:{ type:'category', data:remuneraciones_serie.map(d=>String(d.periodo)), axisLabel:{color:C.axisLabel} },
     yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[{ type:'bar', barMaxWidth:40, data:remuneraciones_serie.map(d=>Number(d.total_liquido)), itemStyle:{color:'#f59e0b',borderRadius:[4,4,0,0]},
-      label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10, color:'#fde68a'},
+    series:[{ type:'bar', barMaxWidth:40, data:remuneraciones_serie.map(d=>Number(d.total_liquido)), itemStyle:{color:'#d97706',borderRadius:[4,4,0,0]},
+      label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10, color:'#fcd34d'},
     }],
     backgroundColor:'transparent',
   } : null
@@ -257,10 +257,10 @@ function TabFinanciero({ detalleData }) {
   return (
     <>
       <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="📈" label="Total Ingresos (histórico)" value={fmtMM(totalIng)} color="#10b981"/>
-        <KPICard icon="📉" label="Total Gastos (histórico)" value={fmtMM(totalGas)} color="#ef4444"/>
-        <KPICard icon="⚖️" label="Superávit Acumulado" value={fmtMM(totalIng-totalGas)} color="#6366f1"/>
-        <KPICard icon="📅" label={`Ingreso ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.ingreso):'—'} color="#8b5cf6"/>
+        <KPICard icon="📈" label="Total Ingresos (histórico)" value={fmtMM(totalIng)} color="#1e40af"/>
+        <KPICard icon="📉" label="Total Gastos (histórico)" value={fmtMM(totalGas)} color="#3b82f6"/>
+        <KPICard icon="⚖️" label="Superávit Acumulado" value={fmtMM(totalIng-totalGas)} color={totalIng-totalGas >= 0 ? '#059669' : '#dc2626'}/>
+        <KPICard icon="📅" label={`Ingreso ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.ingreso):'—'} color="#2563eb"/>
       </div>
       <div className="chart-card" style={{marginBottom:'1.25rem'}}>
         <h3 className="chart-title">Ingreso vs Gasto por Año (mM$)</h3>
@@ -300,9 +300,9 @@ function TabEficiencia({ detalleData }) {
     xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
     yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
     series:[
-      { name:'Gasto en Aula',        type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_aula),  itemStyle:{color:'#10b981'} },
-      { name:'Gasto Administrativo', type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_admin), itemStyle:{color:'#ef4444'} },
-      { name:'Otros Gastos',         type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_otros), itemStyle:{color:'#f59e0b'} },
+      { name:'Gasto en Aula',        type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_aula),  itemStyle:{color:'#059669'} },
+      { name:'Gasto Administrativo', type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_admin), itemStyle:{color:'#dc2626'} },
+      { name:'Otros Gastos',         type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_otros), itemStyle:{color:'#d97706'} },
     ],
     backgroundColor:'transparent',
   }
@@ -331,7 +331,7 @@ function TabEficiencia({ detalleData }) {
         <KPICard icon="📊" label="Prom. Gasto Admin (histórico)" value={`${promAdmin.toFixed(1)}%`} color={promAdmin<=15?'#10b981':promAdmin<=25?'#f59e0b':'#ef4444'}/>
         <KPICard icon="⚙️" label={`Gasto Admin ${ult?.periodo??'—'}`} value={ult?`${ult.pct_admin}%`:'—'} color={ult?EF_COLORS[ult.nivel_eficiencia]:'#94a3b8'} sub={ult?.nivel_eficiencia}/>
         <KPICard icon="🟢" label={`Gasto en Aula ${ult?.periodo??'—'}`} value={ult?`${ult.pct_aula}%`:'—'} color="#10b981"/>
-        <KPICard icon="💰" label={`Total Gasto ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.total_gasto):'—'} color="#8b5cf6"/>
+        <KPICard icon="💰" label={`Total Gasto ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.total_gasto):'—'} color="#2563eb"/>
       </div>
       <div className="chart-card" style={{marginBottom:'1.25rem'}}>
         <h3 className="chart-title">Distribución del Gasto por Categoría (%) por Año</h3>
@@ -475,10 +475,10 @@ function TabSubvencion({ data, periodo }) {
   return (
     <>
       <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="💰" label={`Monto Total${periodo?' '+periodo:' (histórico)'}`} value={fmtMM(total)} color="#6366f1"/>
-        <KPICard icon="📄" label="Documentos" value={fmtN(totalDocs)} color="#10b981"/>
-        <KPICard icon="🏷️" label="Tipos de Subvención" value={fmtN(data.length)} color="#f59e0b"/>
-        <KPICard icon="🏆" label="Subvención Principal" value={data[0]?.subvencion_alias?.slice(0,20)??'—'} color="#8b5cf6" sub={data[0]?fmtMM(data[0].monto_total):''}/>
+        <KPICard icon="💰" label={`Monto Total${periodo?' '+periodo:' (histórico)'}`} value={fmtMM(total)} color="#1e40af"/>
+        <KPICard icon="📄" label="Documentos" value={fmtN(totalDocs)} color="#3b82f6"/>
+        <KPICard icon="🏷️" label="Tipos de Subvención" value={fmtN(data.length)} color="#60a5fa"/>
+        <KPICard icon="🏆" label="Subvención Principal" value={data[0]?.subvencion_alias?.slice(0,20)??'—'} color="#2563eb" sub={data[0]?fmtMM(data[0].monto_total):''}/>
       </div>
       <div className="charts-grid-2">
         <div className="chart-card">

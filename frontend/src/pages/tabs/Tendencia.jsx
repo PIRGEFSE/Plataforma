@@ -4,9 +4,9 @@ import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 
-const COLOR_DOC = '#6366f1'
-const COLOR_LIQ = '#10b981'
-const COLOR_HAB = '#f59e0b'
+const COLOR_DOC = '#2563eb'
+const COLOR_LIQ = '#059669'
+const COLOR_HAB = '#d97706'
 
 export default function Tendencia() {
   const [data, setData] = useState(null)

@@ -243,11 +243,11 @@ ORDER BY orden_riesgo DESC, ratio_pct DESC NULLS LAST`
         <span className="kpi-badge" style={{ marginLeft: 6, background: '#ef444420', color: '#ef4444' }}>🔴 ≥95% Crítico</span>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
         <KPICard label={`Ratio Global Sostenedor (${periodo})`} value={`${data.ratio_global.toFixed(1)}%`} icon={rl.icon} color={rl.color} sub={`Promedio EE: ${data.avg_ratio.toFixed(1)}%`} badge={rl.label} />
         <KPICard label="EE en Riesgo Alto/Crítico" value={fmtN(data.estab_alto_crit)} icon="🔴" color="#ef4444" sub={`de ${fmtN(data.total_estab)} establecimientos`} badge="Atención" />
         <KPICard label={`Total Gasto Remuneracional`} value={fmtAmt(data.total_rem)} icon="👥" color="#ef4444" sub={`Consolidado EE (${unitLabel})`} badge="Nómina" />
-        <KPICard label={`Total Ingreso Depurado`} value={fmtAmt(data.total_ingreso)} icon="💰" color="#6366f1" sub={`Consolidado EE (${unitLabel})`} badge="Ingreso" />
+        <KPICard label={`Total Ingreso Depurado`} value={fmtAmt(data.total_ingreso)} icon="💰" color="#2563eb" sub={`Consolidado EE (${unitLabel})`} badge="Ingreso" />
       </div>
 
       <div className="charts-grid-2" style={{ marginBottom: '1.5rem' }}>
@@ -344,7 +344,7 @@ ORDER BY orden_riesgo DESC, ratio_pct DESC NULLS LAST`
                       <td>{d.rbd != null ? <code>{d.rbd}</code> : <span style={{ color: 'var(--text-muted)' }}>-</span>}</td>
                       <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={d.nom_rbd}>{d.nom_rbd}</td>
                       <td>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${col}20`, color: col, padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: col, fontSize: '0.8rem', fontWeight: 600 }}>
                           {RIESGO_ICON[d.nivel_riesgo]} {d.nivel_riesgo}
                         </span>
                       </td>

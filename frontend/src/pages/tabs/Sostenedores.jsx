@@ -31,7 +31,7 @@ export default function Sostenedores() {
     yAxis: { type: 'category', data: sorted.map(d => d.nombre_sost || `ID:${d.sost_id}`), axisLabel: { color: '#94a3b8', width: 190, overflow: 'truncate' }, axisLine: { lineStyle: { color: '#334155' } } },
     series: [{
       type: 'bar', data: sorted.map(d => d.monto_total), barMaxWidth: 28,
-      itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#6366f1' }, { offset: 1, color: '#8b5cf6' }] } },
+      itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#2563eb' }, { offset: 1, color: '#1e40af' }] } },
       label: { show: true, position: 'right', color: '#94a3b8', formatter: p => fmtMM(p.value) },
     }],
     backgroundColor: 'transparent',

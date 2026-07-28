@@ -96,8 +96,8 @@ function AcreditacionSaldos({ periodo }) {
     series: [{
       type: 'pie', radius: ['42%', '72%'], center: ['40%', '50%'],
       data: [
-        { name: 'Rendido',    value: data.n_rendido,    itemStyle: { color: '#10b981' } },
-        { name: 'No rendido', value: data.n_no_rendido, itemStyle: { color: '#ef4444' } },
+        { name: 'Rendido',    value: data.n_rendido,    itemStyle: { color: '#059669' } },
+        { name: 'No rendido', value: data.n_no_rendido, itemStyle: { color: '#dc2626' } },
       ],
       label: { show: true, formatter: p => `${p.percent}%`, color: '#f1f5f9', fontSize: 11 },
       emphasis: { itemStyle: { shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.4)' } },
@@ -139,9 +139,9 @@ function AcreditacionSaldos({ periodo }) {
     <>
       <div className="kpi-grid">
         <KPICard label="Tasa de Rendición Global" value={`${data.pct_rendido.toFixed(2)}%`} icon={data.pct_rendido >= 90 ? '🟢' : data.pct_rendido >= 70 ? '🟡' : data.pct_rendido >= 40 ? '🟠' : '🔴'} color={colorGlobal} sub={`${fmtN(data.n_rendido)} de ${fmtN(data.n_total)} registros rendidos`} badge={data.pct_rendido >= 90 ? 'Riesgo Bajo' : data.pct_rendido >= 70 ? 'Riesgo Medio' : data.pct_rendido >= 40 ? 'Riesgo Alto' : 'Riesgo Crítico'} />
-        <KPICard label="Registros No Rendidos" value={fmtN(data.n_no_rendido)} icon="⚠️" color="#ef4444" sub={`${data.pct_no_rendido.toFixed(2)}% del total`} badge="No Rendido" />
-        <KPICard label="Monto No Rendido" value={fmtMM(data.monto_no_rendido)} icon="💸" color="#f97316" sub={`${data.monto_total > 0 ? ((data.monto_no_rendido / data.monto_total) * 100).toFixed(2) : 0}% del monto total`} badge="Exposición" />
-        <KPICard label="Sostenedores en Riesgo Alto/Crítico" value={fmtN((data.sost_por_nivel['Riesgo Alto'] ?? 0) + (data.sost_por_nivel['Riesgo Crítico'] ?? 0))} icon="🔴" color="#ef4444" sub={`Medio: ${fmtN(data.sost_por_nivel['Riesgo Medio'] ?? 0)} · Bajo: ${fmtN(data.sost_por_nivel['Riesgo Bajo'] ?? 0)}`} badge="Alta Vigilancia" />
+        <KPICard label="Registros No Rendidos" value={fmtN(data.n_no_rendido)} icon="⚠️" color="#dc2626" sub={`${data.pct_no_rendido.toFixed(2)}% del total`} badge="No Rendido" />
+        <KPICard label="Monto No Rendido" value={fmtMM(data.monto_no_rendido)} icon="💸" color="#d97706" sub={`${data.monto_total > 0 ? ((data.monto_no_rendido / data.monto_total) * 100).toFixed(2) : 0}% del monto total`} badge="Exposición" />
+        <KPICard label="Sostenedores en Riesgo Alto/Crítico" value={fmtN((data.sost_por_nivel['Riesgo Alto'] ?? 0) + (data.sost_por_nivel['Riesgo Crítico'] ?? 0))} icon="🔴" color="#dc2626" sub={`Medio: ${fmtN(data.sost_por_nivel['Riesgo Medio'] ?? 0)} · Bajo: ${fmtN(data.sost_por_nivel['Riesgo Bajo'] ?? 0)}`} badge="Alta Vigilancia" />
       </div>
       <div className="charts-grid-2">
         <div className="chart-card"><h3 className="chart-title">Tasa de Rendición Global</h3><ReactECharts option={gaugeOption} style={{ height: 280 }} /><div style={{ textAlign: 'center', marginTop: -12, fontSize: '0.8rem', color: 'var(--text-muted)' }}>🟢 ≥90% Bajo · 🟡 70-89% Medio · 🟠 40-69% Alto · 🔴 &lt;40% Crítico</div></div>
@@ -160,7 +160,7 @@ function AcreditacionSaldos({ periodo }) {
               {data.top_sostenedores.map((d, i) => (
                 <tr key={`${d.sost_id}-${i}`}>
                   <td><code>{d.sost_id}</code></td>
-                  <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${RIESGO_COLOR[d.nivel_riesgo]}20`, color: RIESGO_COLOR[d.nivel_riesgo], padding: '2px 10px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600 }}>{RIESGO_ICON[d.nivel_riesgo]} {d.nivel_riesgo}</span></td>
+                  <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: RIESGO_COLOR[d.nivel_riesgo], fontSize: '0.8rem', fontWeight: 600 }}>{RIESGO_ICON[d.nivel_riesgo]} {d.nivel_riesgo}</span></td>
                   <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--surface-overlay)', overflow: 'hidden' }}><div style={{ width: `${d.pct_rendido}%`, height: '100%', background: RIESGO_COLOR[d.nivel_riesgo], borderRadius: 3 }} /></div><span style={{ fontSize: '0.82rem' }}>{Number(d.pct_rendido).toFixed(1)}%</span></div></td>
                   <td style={{ color: '#ef4444', fontWeight: 600 }}>{fmtMM(d.monto_no_rendido)}</td>
                   <td>{fmtMM(d.monto_total)}</td>
