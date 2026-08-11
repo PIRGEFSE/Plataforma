@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: postgis/postgis:16-3.5
     container_name: pirgefse_db
     restart: unless-stopped
     env_file: .env

@@ -2626,3 +2626,715 @@ async def ficha_sostenedor_presupuesto(
         "agno_usado":       agno_usado,
         "agno_disponibles": agno_disponibles,
     }
+
+
+# ── GeoEstablecimiento — Filtros (regiones/comunas) ────────────────────────
+
+@router.get("/geo-establecimientos/filtros")
+async def geo_filtros(
+    cod_reg: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Devuelve listas de regiones y, si se pasa cod_reg, comunas de esa región."""
+    q_reg = await db.execute(text("""
+        SELECT DISTINCT cod_reg_rbd AS cod_reg, nom_reg_rbd_a AS nom_reg
+        FROM dim_establecimiento_oficial
+        WHERE cod_reg_rbd IS NOT NULL
+        ORDER BY cod_reg_rbd
+    """))
+    regiones = [{"cod_reg": r.cod_reg, "nom_reg": r.nom_reg} for r in q_reg]
+
+    comunas = []
+    if cod_reg:
+        q_com = await db.execute(text("""
+            SELECT DISTINCT cod_com_rbd AS cod_com, nom_com_rbd AS nom_com
+            FROM dim_establecimiento_oficial
+            WHERE cod_reg_rbd = :r AND cod_com_rbd IS NOT NULL
+            ORDER BY nom_com_rbd
+        """), {"r": cod_reg})
+        comunas = [{"cod_com": c.cod_com, "nom_com": c.nom_com} for c in q_com]
+
+    return {"regiones": regiones, "comunas": comunas}
+
+
+# ── GeoEstablecimiento — GeoJSON ────────────────────────────────────────────
+
+@router.get("/geo-establecimientos")
+async def geo_establecimientos(
+    periodo: int = Query(default=2024),
+    sost_id: Optional[int] = None,
+    cod_reg: Optional[int] = None,
+    cod_com: Optional[int] = None,
+    bbox: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """GeoJSON de establecimientos con filtro por sostenedor, región, comuna o bbox."""
+    import json as _json
+
+    conditions = ["d.geom IS NOT NULL", "d.agno = :periodo"]
+    params: dict = {"periodo": periodo}
+
+    if sost_id:
+        conditions.append("d.rut_sostenedor = :sost_id")
+        params["sost_id"] = sost_id
+    elif cod_com:
+        conditions.append("d.cod_com_rbd = :cod_com")
+        params["cod_com"] = cod_com
+    elif cod_reg:
+        conditions.append("d.cod_reg_rbd = :cod_reg")
+        params["cod_reg"] = cod_reg
+    elif bbox:
+        try:
+            min_lng, min_lat, max_lng, max_lat = [float(x) for x in bbox.split(",")]
+            conditions.append(
+                "d.geom && ST_MakeEnvelope(:min_lng, :min_lat, :max_lng, :max_lat, 4326)"
+            )
+            params.update(min_lng=min_lng, min_lat=min_lat, max_lng=max_lng, max_lat=max_lat)
+        except ValueError:
+            pass
+
+    where = " AND ".join(conditions)
+
+    q = await db.execute(text(f"""
+        SELECT d.rbd, d.nom_rbd, d.cod_reg_rbd, d.nom_reg_rbd_a,
+               d.cod_com_rbd, d.nom_com_rbd, d.cod_depe,
+               d.rural_rbd, d.convenio_pie, d.pace, d.mat_total,
+               d.estado_estab, ST_AsGeoJSON(d.geom)::text AS geom_json
+        FROM dim_establecimiento_oficial d
+        WHERE {where}
+        ORDER BY d.nom_rbd
+        LIMIT 5000
+    """), params)
+
+    rows = q.mappings().all()
+    features = []
+    for r in rows:
+        try:
+            geom = _json.loads(r["geom_json"])
+        except Exception:
+            continue
+        features.append({
+            "type": "Feature",
+            "geometry": geom,
+            "properties": {
+                "rbd": r["rbd"], "nom_rbd": r["nom_rbd"],
+                "cod_reg_rbd": r["cod_reg_rbd"], "nom_reg_rbd": r["nom_reg_rbd_a"],
+                "cod_com_rbd": r["cod_com_rbd"], "nom_com_rbd": r["nom_com_rbd"],
+                "cod_depe": r["cod_depe"], "rural_rbd": bool(r["rural_rbd"]),
+                "convenio_pie": bool(r["convenio_pie"]), "pace": bool(r["pace"]),
+                "mat_total": r["mat_total"], "estado_estab": r["estado_estab"],
+            },
+        })
+
+    return {
+        "geojson": {"type": "FeatureCollection", "features": features},
+        "stats": {"total": len(rows), "con_coords": len(features)},
+    }
+
+
+# ── GeoEstablecimiento — Agregados (Panel Inferior) ─────────────────────────
+
+@router.get("/geo-establecimientos/agregados")
+async def geo_establecimientos_agregados(
+    periodo: int = Query(default=2024),
+    sost_id: Optional[int] = None,
+    cod_reg: Optional[int] = None,
+    cod_com: Optional[int] = None,
+    bbox: Optional[str] = None,
+    rbd: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Obtiene estadísticas agregadas para el panel inferior basadas en el filtro actual."""
+    
+    conditions = ["d.agno = :periodo"]
+    params: dict = {"periodo": periodo}
+    
+    is_exact_comuna = False
+    is_exact_region = False
+
+    if rbd:
+        conditions.append("d.rbd = :rbd")
+        params["rbd"] = rbd
+    elif sost_id:
+        conditions.append("d.rut_sostenedor = :sost_id")
+        params["sost_id"] = sost_id
+    elif bbox:
+        try:
+            min_lng, min_lat, max_lng, max_lat = [float(x) for x in bbox.split(",")]
+            conditions.append("d.geom && ST_MakeEnvelope(:min_lng, :min_lat, :max_lng, :max_lat, 4326)")
+            params.update(min_lng=min_lng, min_lat=min_lat, max_lng=max_lng, max_lat=max_lat)
+        except ValueError:
+            pass
+    elif cod_com:
+        conditions.append("d.cod_com_rbd = :cod_com")
+        params["cod_com"] = cod_com
+        is_exact_comuna = True
+    elif cod_reg:
+        conditions.append("d.cod_reg_rbd = :cod_reg")
+        params["cod_reg"] = cod_reg
+        is_exact_region = True
+
+    where = " AND ".join(conditions)
+    
+    q = await db.execute(text(f"""
+        WITH filtered_rbds AS (
+            SELECT d.rbd, d.mat_total 
+            FROM dim_establecimiento_oficial d
+            WHERE {where}
+        ),
+        finanzas AS (
+            SELECT 
+                SUM(e.ingresos_totales) AS ingresos,
+                SUM(e.gastos_totales) AS gastos
+            FROM mv_finanzas_rbd e
+            JOIN filtered_rbds f ON e.rbd = f.rbd
+            WHERE e.periodo = :periodo
+        ),
+        ive AS (
+            SELECT AVG(i.ive_sinae) AS promedio_ive
+            FROM dim_ive i
+            JOIN filtered_rbds f ON i.rbd = f.rbd
+        ),
+        asistencia AS (
+            SELECT AVG(a.tasa_asistencia_anual) AS promedio_asistencia
+            FROM dim_asistencia_anual a
+            JOIN filtered_rbds f ON a.rbd = f.rbd
+        ),
+        simce_calc AS (
+            SELECT 
+                s.grado,
+                SUM(s.nalu_lect) as nalu_lect,
+                SUM(s.nalu_mate) as nalu_mate,
+                SUM(s.palu_eda_ins_lect * s.nalu_lect) / NULLIF(SUM(s.nalu_lect), 0) as ins_lect,
+                SUM(s.palu_eda_ele_lect * s.nalu_lect) / NULLIF(SUM(s.nalu_lect), 0) as ele_lect,
+                SUM(s.palu_eda_ade_lect * s.nalu_lect) / NULLIF(SUM(s.nalu_lect), 0) as ade_lect,
+                SUM(s.palu_eda_ins_mate * s.nalu_mate) / NULLIF(SUM(s.nalu_mate), 0) as ins_mate,
+                SUM(s.palu_eda_ele_mate * s.nalu_mate) / NULLIF(SUM(s.nalu_mate), 0) as ele_mate,
+                SUM(s.palu_eda_ade_mate * s.nalu_mate) / NULLIF(SUM(s.nalu_mate), 0) as ade_mate,
+                SUM(s.prom_lect * s.nalu_lect) / NULLIF(SUM(s.nalu_lect), 0) as prom_lect_calc,
+                SUM(s.prom_mate * s.nalu_mate) / NULLIF(SUM(s.nalu_mate), 0) as prom_mate_calc
+            FROM dim_simce s
+            JOIN filtered_rbds f ON s.rbd = f.rbd
+            WHERE s.agno = 2024
+            GROUP BY s.grado
+        )
+        SELECT 
+            (SELECT SUM(mat_total) FROM filtered_rbds) as matricula,
+            (SELECT ingresos FROM finanzas),
+            (SELECT gastos FROM finanzas),
+            (SELECT promedio_ive FROM ive),
+            (SELECT promedio_asistencia FROM asistencia),
+            COALESCE((SELECT json_agg(row_to_json(simce_calc)) FROM simce_calc), '[]'::json) as simce_data
+    """), params)
+    
+    row = q.fetchone()
+    if not row:
+        return {}
+
+    import json
+    simce_data = row[5]
+    if isinstance(simce_data, str):
+        simce_data = json.loads(simce_data)
+
+    simce_dict = {item['grado']: item for item in simce_data}
+
+    if is_exact_comuna and not rbd:
+        q_com = await db.execute(text("SELECT grado, prom_lect, prom_mate FROM dim_simce_comuna WHERE cod_com = :c"), {"c": cod_com})
+        for c in q_com.fetchall():
+            if c[0] in simce_dict:
+                simce_dict[c[0]]['prom_lect_calc'] = float(c[1]) if c[1] else None
+                simce_dict[c[0]]['prom_mate_calc'] = float(c[2]) if c[2] else None
+    elif is_exact_region and not rbd:
+        q_reg = await db.execute(text("SELECT grado, prom_lect, prom_mate FROM dim_simce_region WHERE cod_reg = :r"), {"r": cod_reg})
+        for r_row in q_reg.fetchall():
+            if r_row[0] in simce_dict:
+                simce_dict[r_row[0]]['prom_lect_calc'] = float(r_row[1]) if r_row[1] else None
+                simce_dict[r_row[0]]['prom_mate_calc'] = float(r_row[2]) if r_row[2] else None
+
+    def f(v):
+        return float(v) if v is not None else None
+
+    simce_final = {}
+    for g, data in simce_dict.items():
+        simce_final[g] = {
+            "nalu_lect": data.get("nalu_lect"),
+            "nalu_mate": data.get("nalu_mate"),
+            "prom_lect": f(data.get("prom_lect_calc")),
+            "prom_mate": f(data.get("prom_mate_calc")),
+            "ins_lect": f(data.get("ins_lect")),
+            "ele_lect": f(data.get("ele_lect")),
+            "ade_lect": f(data.get("ade_lect")),
+            "ins_mate": f(data.get("ins_mate")),
+            "ele_mate": f(data.get("ele_mate")),
+            "ade_mate": f(data.get("ade_mate")),
+        }
+
+    # ── Datos Censo 2024 ─────────────────────────────────────────────────────
+    censo_query = None
+    censo_params = {}
+    censo_nivel = "Nacional"
+
+    if is_exact_comuna and not rbd:
+        censo_query = "SELECT COUNT(*) AS viviendas, SUM(cant_hog) AS hogares, SUM(cant_per) AS personas FROM censo2024.viviendas WHERE comuna = :cod_com"
+        censo_params["cod_com"] = cod_com
+        censo_nivel = "Comuna"
+    elif is_exact_region and not rbd:
+        censo_query = "SELECT COUNT(*) AS viviendas, SUM(cant_hog) AS hogares, SUM(cant_per) AS personas FROM censo2024.viviendas WHERE region = :cod_reg"
+        censo_params["cod_reg"] = cod_reg
+        censo_nivel = "Región"
+
+    censo_data = None
+    if censo_query:
+        q_censo = await db.execute(text(censo_query), censo_params)
+        r_censo = q_censo.fetchone()
+        if r_censo and (r_censo[0] or r_censo[1] or r_censo[2]):
+            censo_data = {
+                "viviendas": int(r_censo[0] or 0),
+                "hogares": int(r_censo[1] or 0),
+                "personas": int(r_censo[2] or 0),
+                "nivel": censo_nivel
+            }
+
+    return {
+        "matricula": f(row[0]),
+        "ingresos": f(row[1]),
+        "gastos": f(row[2]),
+        "ive": f(row[3]),
+        "tasa_asistencia": f(row[4]),
+        "simce": simce_final,
+        "censo": censo_data
+    }
+
+
+# ── SIMCE Sostenedor — Tendencia histórica ──────────────────────────────────
+
+@router.get("/ficha-sostenedor/simce")
+async def ficha_sostenedor_simce(
+    sost_id: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Evolución histórica de puntajes SIMCE para los establecimientos de un sostenedor.
+
+    Devuelve series separadas por cada RBD (promedio ponderado por nalu), por cada
+    comuna distinta (dim_simce_comuna), por cada región distinta (dim_simce_region),
+    y el promedio nacional (promedio simple de dim_simce_region sobre todos los cod_reg).
+
+    El eje X son todos los años disponibles en dim_simce para ese sostenedor.
+    Los puntos se conectan aunque existan brechas de años.
+    """
+
+    def to_f(v):
+        return float(v) if v is not None else None
+
+    # ── 1. RBDs del sostenedor (todos los años) ───────────────────────────────
+    rbds_q = await db.execute(text("""
+        SELECT DISTINCT rbd
+        FROM dim_establecimiento_oficial
+        WHERE rut_sostenedor = :sid
+    """), {"sid": sost_id})
+    rbds_sost = [r[0] for r in rbds_q.fetchall()]
+
+    if not rbds_sost:
+        return {
+            "grados_disponibles": [],
+            "serie": {},
+            "comunas": [],
+            "regiones": [],
+        }
+
+    # ── 2. Serie RBD — promedio ponderado por nalu, agrupado por (agno, grado) ─
+    rbd_q = await db.execute(text("""
+        SELECT
+            agno,
+            grado,
+            SUM(prom_lect * nalu_lect) / NULLIF(SUM(nalu_lect), 0) AS prom_lect,
+            SUM(prom_mate * nalu_mate) / NULLIF(SUM(nalu_mate), 0) AS prom_mate,
+            SUM(nalu_lect) AS total_nalu_lect,
+            SUM(nalu_mate) AS total_nalu_mate
+        FROM dim_simce
+        WHERE rbd = ANY(:rbds)
+          AND prom_lect IS NOT NULL OR prom_mate IS NOT NULL
+        GROUP BY agno, grado
+        ORDER BY agno, grado
+    """), {"rbds": rbds_sost})
+
+    rbd_serie = {}  # {grado: {agno: {prom_lect, prom_mate}}}
+    grados_set = set()
+    agnos_set = set()
+    for r in rbd_q.mappings():
+        g = r["grado"]
+        a = int(r["agno"])
+        grados_set.add(g)
+        agnos_set.add(a)
+        if g not in rbd_serie:
+            rbd_serie[g] = {}
+        rbd_serie[g][a] = {
+            "prom_lect": to_f(r["prom_lect"]),
+            "prom_mate": to_f(r["prom_mate"]),
+        }
+
+    # ── 3. Comunas y regiones distintas de los RBDs del sostenedor ───────────
+    geo_q = await db.execute(text("""
+        SELECT DISTINCT cod_com_rbd, nom_com_rbd, cod_reg_rbd, nom_reg_rbd
+        FROM dim_simce
+        WHERE rbd = ANY(:rbds)
+          AND cod_com_rbd IS NOT NULL
+    """), {"rbds": rbds_sost})
+
+    comunas_info = {}   # {cod_com: nom_com}
+    regiones_info = {}  # {cod_reg: nom_reg}
+    for r in geo_q.mappings():
+        if r["cod_com_rbd"]:
+            comunas_info[int(r["cod_com_rbd"])] = r["nom_com_rbd"] or f"Cod {r['cod_com_rbd']}"
+        if r["cod_reg_rbd"]:
+            regiones_info[int(r["cod_reg_rbd"])] = r["nom_reg_rbd"] or f"Región {r['cod_reg_rbd']}"
+
+    # ── 4. Serie por COMUNA — dim_simce_comuna ────────────────────────────────
+    comunas_list = list(comunas_info.keys())
+    com_serie = {}  # {cod_com: {grado: {agno: {prom_lect, prom_mate}}}}
+
+    if comunas_list:
+        com_q = await db.execute(text("""
+            SELECT cod_com, agno, grado, prom_lect, prom_mate
+            FROM dim_simce_comuna
+            WHERE cod_com = ANY(:coms)
+            ORDER BY cod_com, agno, grado
+        """), {"coms": comunas_list})
+        for r in com_q.mappings():
+            c = int(r["cod_com"])
+            a = int(r["agno"])
+            g = r["grado"]
+            agnos_set.add(a)
+            if c not in com_serie:
+                com_serie[c] = {}
+            if g not in com_serie[c]:
+                com_serie[c][g] = {}
+            com_serie[c][g][a] = {
+                "prom_lect": to_f(r["prom_lect"]),
+                "prom_mate": to_f(r["prom_mate"]),
+            }
+
+    # ── 5. Serie por REGIÓN — dim_simce_region ────────────────────────────────
+    regiones_list = list(regiones_info.keys())
+    reg_serie = {}  # {cod_reg: {grado: {agno: {prom_lect, prom_mate}}}}
+
+    if regiones_list:
+        reg_q = await db.execute(text("""
+            SELECT cod_reg, agno, grado, prom_lect, prom_mate
+            FROM dim_simce_region
+            WHERE cod_reg = ANY(:regs)
+            ORDER BY cod_reg, agno, grado
+        """), {"regs": regiones_list})
+        for r in reg_q.mappings():
+            cr = int(r["cod_reg"])
+            a = int(r["agno"])
+            g = r["grado"]
+            agnos_set.add(a)
+            if cr not in reg_serie:
+                reg_serie[cr] = {}
+            if g not in reg_serie[cr]:
+                reg_serie[cr][g] = {}
+            reg_serie[cr][g][a] = {
+                "prom_lect": to_f(r["prom_lect"]),
+                "prom_mate": to_f(r["prom_mate"]),
+            }
+
+    # ── 6. Promedio NACIONAL — promedio simple de dim_simce_region ────────────
+    nac_q = await db.execute(text("""
+        SELECT agno, grado,
+               ROUND(AVG(prom_lect)::numeric, 2) AS prom_lect,
+               ROUND(AVG(prom_mate)::numeric, 2) AS prom_mate
+        FROM dim_simce_region
+        GROUP BY agno, grado
+        ORDER BY agno, grado
+    """))
+    nac_serie = {}  # {grado: {agno: {prom_lect, prom_mate}}}
+    for r in nac_q.mappings():
+        g = r["grado"]
+        a = int(r["agno"])
+        agnos_set.add(a)
+        if g not in nac_serie:
+            nac_serie[g] = {}
+        nac_serie[g][a] = {
+            "prom_lect": to_f(r["prom_lect"]),
+            "prom_mate": to_f(r["prom_mate"]),
+        }
+
+    # ── 7. Construir respuesta final estructurada por grado ───────────────────
+    agnos_sorted = sorted(agnos_set)
+    grados_order = ["4b", "6b", "8b", "2m"]  # orden pedagógico
+    grados_disponibles = [g for g in grados_order if g in grados_set]
+    # incluir grados que estén en los datos pero no en el orden predefinido
+    for g in sorted(grados_set):
+        if g not in grados_disponibles:
+            grados_disponibles.append(g)
+
+    serie_final = {}
+    for g in grados_disponibles:
+        puntos = []
+        for a in agnos_sorted:
+            punto = {"agno": a}
+            # RBD
+            rbd_pt = rbd_serie.get(g, {}).get(a, {})
+            punto["rbd_lect"] = rbd_pt.get("prom_lect")
+            punto["rbd_mate"] = rbd_pt.get("prom_mate")
+            # Comunas
+            punto["comunas"] = {}
+            for cod_com in comunas_list:
+                com_pt = com_serie.get(cod_com, {}).get(g, {}).get(a, {})
+                punto["comunas"][str(cod_com)] = {
+                    "prom_lect": com_pt.get("prom_lect"),
+                    "prom_mate": com_pt.get("prom_mate"),
+                }
+            # Regiones
+            punto["regiones"] = {}
+            for cod_reg in regiones_list:
+                reg_pt = reg_serie.get(cod_reg, {}).get(g, {}).get(a, {})
+                punto["regiones"][str(cod_reg)] = {
+                    "prom_lect": reg_pt.get("prom_lect"),
+                    "prom_mate": reg_pt.get("prom_mate"),
+                }
+            # Nacional
+            nac_pt = nac_serie.get(g, {}).get(a, {})
+            punto["nac_lect"] = nac_pt.get("prom_lect")
+            punto["nac_mate"] = nac_pt.get("prom_mate")
+            puntos.append(punto)
+        serie_final[g] = puntos
+
+    return {
+        "grados_disponibles": grados_disponibles,
+        "agnos": agnos_sorted,
+        "serie": serie_final,
+        "comunas": [{"cod_com": k, "nom_com": v} for k, v in sorted(comunas_info.items())],
+        "regiones": [{"cod_reg": k, "nom_reg": v} for k, v in sorted(regiones_info.items())],
+    }
+
+
+# ── Convivencia Escolar ──────────────────────────────────────────────────────
+
+@router.get("/ficha-sostenedor/convivencia")
+async def ficha_sostenedor_convivencia(
+    sost_id: int = Query(...),
+    periodo: int = Query(default=2024),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Análisis de Convivencia Escolar (dim_convivencia_escolar) para un sostenedor.
+    Cruza con dim_ive, Tabla_SNED, dim_simce y estado_resultado por RBD y año.
+    Para 2020-2021 el filtrado por sostenedor se hace vía JOIN con dim_establecimiento_oficial,
+    ya que en esos años la columna RUT_SOST no existe en la fuente original.
+    """
+
+    def to_f(v):
+        return float(v) if v is not None else None
+
+    # ── Períodos disponibles ──────────────────────────────────────────────────
+    per_q = await db.execute(text("""
+        SELECT DISTINCT CAST(NULLIF(TRIM(ce."AGNO"), '') AS INTEGER) AS agno
+        FROM dim_convivencia_escolar ce
+        JOIN dim_establecimiento_oficial eo
+            ON CAST(NULLIF(TRIM(ce."EE_RBD"), '') AS INTEGER) = eo.rbd
+           AND CAST(NULLIF(TRIM(ce."AGNO"), '') AS INTEGER) = eo.agno
+        WHERE eo.rut_sostenedor = :sid
+          AND NULLIF(TRIM(ce."EE_RBD"), '') IS NOT NULL
+          AND NULLIF(TRIM(ce."AGNO"), '') IS NOT NULL
+        ORDER BY agno DESC
+    """), {"sid": sost_id})
+    periodos_disponibles = [r[0] for r in per_q.fetchall()]
+
+    agno = periodo if periodo in periodos_disponibles else (periodos_disponibles[0] if periodos_disponibles else periodo)
+
+    # ── RBDs del sostenedor para el año ──────────────────────────────────────
+    rbds_q = await db.execute(text("""
+        SELECT rbd FROM dim_establecimiento_oficial
+        WHERE rut_sostenedor = :sid AND agno = :agno
+    """), {"sid": sost_id, "agno": agno})
+    rbds_sost = [r[0] for r in rbds_q.fetchall()]
+
+    if not rbds_sost:
+        return {
+            "kpis": {"total_casos": 0, "pct_cerrados": 0, "pct_mediados": 0, "n_establecimientos": 0, "ive_promedio": None},
+            "serie_anual": [],
+            "por_establecimiento": [],
+            "por_mecanismo": [],
+            "por_tema": [],
+            "periodos_disponibles": periodos_disponibles,
+            "periodo_usado": agno,
+        }
+
+    rbds_list = list(rbds_sost)
+
+    # ── Casos por establecimiento cruzados con las otras dimensiones ──────────
+    ee_q = await db.execute(text("""
+        WITH gcc AS (
+            SELECT
+                CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER) AS rbd,
+                COUNT(*) AS total_casos,
+                SUM(CASE WHEN "GCC_MECANISMO" = '1' THEN 1 ELSE 0 END) AS casos_mediacion,
+                SUM(CASE WHEN "GCC_DENUNCIA" = '1' THEN 1 ELSE 0 END) AS casos_denuncia,
+                SUM(CASE WHEN "GCC_ESTADO" = '2' THEN 1 ELSE 0 END) AS casos_cerrados
+            FROM dim_convivencia_escolar
+            WHERE "AGNO" = :agno_str
+              AND NULLIF(TRIM("EE_RBD"), '') IS NOT NULL
+              AND CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER) = ANY(:rbds)
+            GROUP BY CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER)
+        ),
+        ive_data AS (
+            SELECT rbd, ROUND(AVG(ive_sinae)::NUMERIC, 4) AS ive_sinae
+            FROM dim_ive WHERE periodo = :agno
+            GROUP BY rbd
+        ),
+        sned_data AS (
+            SELECT nro_establecimiento AS rbd,
+                   ROUND(AVG(ind_sned)::NUMERIC, 4) AS ind_sned
+            FROM "Tabla_SNED" WHERE agno = :agno
+            GROUP BY nro_establecimiento
+        ),
+        simce_data AS (
+            SELECT rbd,
+                   ROUND(AVG(prom_lect)::NUMERIC, 2) AS prom_lect,
+                   ROUND(AVG(prom_mate)::NUMERIC, 2) AS prom_mate
+            FROM dim_simce WHERE agno = :agno
+            GROUP BY rbd
+        ),
+        fin_data AS (
+            SELECT rbd,
+                SUM(CASE WHEN UPPER(TRIM(desc_tipo_cuenta)) LIKE '%%INGRESO%%'
+                         AND cuenta_alias_padre LIKE '3%%'
+                         AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+                         THEN monto_declarado ELSE 0 END) AS ingreso,
+                SUM(CASE WHEN UPPER(TRIM(desc_tipo_cuenta)) LIKE '%%GASTO%%'
+                         AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+                         THEN monto_declarado ELSE 0 END) AS gasto
+            FROM estado_resultado
+            WHERE sost_id = :sid AND periodo = :agno
+              AND UPPER(TRIM(desc_estado)) = 'RENDIDO'
+            GROUP BY rbd
+        )
+        SELECT
+            gcc.rbd,
+            eo.nom_rbd,
+            gcc.total_casos,
+            gcc.casos_mediacion,
+            gcc.casos_denuncia,
+            gcc.casos_cerrados,
+            ive.ive_sinae,
+            sned.ind_sned,
+            simce.prom_lect,
+            simce.prom_mate,
+            fin.ingreso,
+            fin.gasto
+        FROM gcc
+        LEFT JOIN dim_establecimiento_oficial eo ON eo.rbd = gcc.rbd AND eo.agno = :agno
+        LEFT JOIN ive_data ive ON ive.rbd = gcc.rbd
+        LEFT JOIN sned_data sned ON sned.rbd = gcc.rbd
+        LEFT JOIN simce_data simce ON simce.rbd = gcc.rbd
+        LEFT JOIN fin_data fin ON fin.rbd = gcc.rbd
+        ORDER BY gcc.total_casos DESC
+    """), {"sid": sost_id, "agno": agno, "agno_str": str(agno), "rbds": rbds_list})
+
+    por_establecimiento = []
+    for r in ee_q.mappings():
+        row = dict(r)
+        for col in ("ive_sinae", "ind_sned", "prom_lect", "prom_mate", "ingreso", "gasto"):
+            row[col] = to_f(row.get(col))
+        por_establecimiento.append(row)
+
+    # ── KPIs globales ─────────────────────────────────────────────────────────
+    total_casos = sum(r.get("total_casos") or 0 for r in por_establecimiento)
+    total_cerrados = sum(r.get("casos_cerrados") or 0 for r in por_establecimiento)
+    total_mediados = sum(r.get("casos_mediacion") or 0 for r in por_establecimiento)
+    n_ee = len(por_establecimiento)
+    ives = [r["ive_sinae"] for r in por_establecimiento if r.get("ive_sinae") is not None]
+    ive_promedio = round(sum(ives) / len(ives), 4) if ives else None
+
+    kpis = {
+        "total_casos": total_casos,
+        "pct_cerrados": round(total_cerrados / total_casos * 100, 1) if total_casos else 0,
+        "pct_mediados": round(total_mediados / total_casos * 100, 1) if total_casos else 0,
+        "n_establecimientos": n_ee,
+        "ive_promedio": ive_promedio,
+    }
+
+    # ── Serie anual histórica (todos los años disponibles del sostenedor) ─────
+    serie_q = await db.execute(text("""
+        SELECT
+            CAST(NULLIF(TRIM("AGNO"), '') AS INTEGER) AS agno,
+            COUNT(*) AS total_casos,
+            SUM(CASE WHEN "GCC_MECANISMO" = '1' THEN 1 ELSE 0 END) AS casos_mediacion,
+            SUM(CASE WHEN "GCC_DENUNCIA" = '1' THEN 1 ELSE 0 END) AS casos_denuncia,
+            COUNT(DISTINCT CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER)) AS n_establecimientos
+        FROM dim_convivencia_escolar
+        WHERE NULLIF(TRIM("EE_RBD"), '') IS NOT NULL
+          AND CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER) = ANY(:rbds)
+        GROUP BY CAST(NULLIF(TRIM("AGNO"), '') AS INTEGER)
+        ORDER BY agno ASC
+    """), {"rbds": rbds_list})
+    serie_anual = [dict(r) for r in serie_q.mappings()]
+
+    # ── Distribución por mecanismo ────────────────────────────────────────────
+    MECANISMO_MAP = {
+        "1": "Mediación", "2": "Orientación", "3": "Derivación",
+        "4": "Información", "5": "Otro",
+    }
+    mec_q = await db.execute(text("""
+        SELECT "GCC_MECANISMO" AS mecanismo, COUNT(*) AS casos
+        FROM dim_convivencia_escolar
+        WHERE "AGNO" = :agno_str
+          AND NULLIF(TRIM("EE_RBD"), '') IS NOT NULL
+          AND CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER) = ANY(:rbds)
+        GROUP BY "GCC_MECANISMO"
+        ORDER BY casos DESC
+    """), {"agno_str": str(agno), "rbds": rbds_list})
+    por_mecanismo = [
+        {
+            "mecanismo": MECANISMO_MAP.get(r["mecanismo"], r["mecanismo"] or "Sin info"),
+            "casos": r["casos"],
+        }
+        for r in mec_q.mappings()
+    ]
+
+    # ── Top temas de ingreso ──────────────────────────────────────────────────
+    TEMA_MAP = {
+        "1": "Maltrato entre pares", "2": "Acoso escolar", "3": "Violencia física",
+        "4": "Violencia psicológica", "5": "Abuso sexual", "6": "Conflicto docente-apoderado",
+        "7": "Conflicto docente-alumno", "8": "Conflicto entre apoderados",
+        "9": "Discriminación", "10": "Otros", "11": "No aplica",
+        "12": "Ciberbullying", "13": "Racismo/Xenofobia", "14": "Homofobia",
+        "15": "Conflicto con funcionario", "16": "Porte de armas", "17": "Drogas/Alcohol",
+    }
+    tema_q = await db.execute(text("""
+        SELECT "GCC_TEMA_INGRESO" AS tema, COUNT(*) AS casos
+        FROM dim_convivencia_escolar
+        WHERE "AGNO" = :agno_str
+          AND NULLIF(TRIM("EE_RBD"), '') IS NOT NULL
+          AND CAST(NULLIF(TRIM("EE_RBD"), '') AS INTEGER) = ANY(:rbds)
+          AND "GCC_TEMA_INGRESO" IS NOT NULL AND TRIM("GCC_TEMA_INGRESO") <> ''
+          AND TRIM("GCC_TEMA_INGRESO") <> ';'
+        GROUP BY "GCC_TEMA_INGRESO"
+        ORDER BY casos DESC
+        LIMIT 10
+    """), {"agno_str": str(agno), "rbds": rbds_list})
+    por_tema = [
+        {
+            "tema": TEMA_MAP.get(str(r["tema"]).strip(), f"Tema {r['tema']}"),
+            "casos": r["casos"],
+        }
+        for r in tema_q.mappings()
+    ]
+
+    return {
+        "kpis": kpis,
+        "serie_anual": serie_anual,
+        "por_establecimiento": por_establecimiento,
+        "por_mecanismo": por_mecanismo,
+        "por_tema": por_tema,
+        "periodos_disponibles": periodos_disponibles,
+        "periodo_usado": agno,
+    }

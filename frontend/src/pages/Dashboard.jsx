@@ -15,6 +15,7 @@ import Usuarios from './tabs/Usuarios'
 import FichaSostenedor from './tabs/FichaSostenedor'
 import SubvencionSostenedor from './tabs/SubvencionSostenedor'
 import FichaEstablecimiento from './tabs/FichaEstablecimiento'
+import GeoEstablecimiento from './tabs/GeoEstablecimiento'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: '📊', roles: ['admin', 'viewer'] },
@@ -103,6 +104,27 @@ const SOSTENEDOR_NAV_GROUPS = [
       { label: 'Complejidad Educativa', icon: '🧩', lsKey: 'pirgefse-fichasost-territorio', lsVal: 'complejidad' },
       { label: 'Gasto Educativo',       icon: '💰', lsKey: 'pirgefse-fichasost-territorio', lsVal: 'gasto' },
     ],
+  },
+  {
+    path: '/mi-ficha/geo-establecimiento',
+    label: 'Geo Localización',
+    icon: '📍',
+    exact: true,
+    children: [],
+  },
+  {
+    path: '/mi-ficha/convivencia',
+    label: 'Convivencia Escolar',
+    icon: '🤝',
+    exact: true,
+    children: [],
+  },
+  {
+    path: '/mi-ficha/simce',
+    label: 'SIMCE',
+    icon: '📈',
+    exact: true,
+    children: [],
   },
 ]
 
@@ -314,6 +336,9 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/comportamiento-financiero" element={<FichaSostenedor section="comportamiento_financiero" />} />
                 <Route path="/mi-ficha/territorio" element={<FichaSostenedor section="territorio" />} />
                 <Route path="/mi-ficha/presupuesto" element={<FichaSostenedor section="presupuesto" />} />
+                <Route path="/mi-ficha/geo-establecimiento" element={<FichaSostenedor section="geo_establecimiento" />} />
+                <Route path="/mi-ficha/convivencia" element={<FichaSostenedor section="convivencia" />} />
+                <Route path="/mi-ficha/simce" element={<FichaSostenedor section="simce" />} />
                 <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
               </>
             )}

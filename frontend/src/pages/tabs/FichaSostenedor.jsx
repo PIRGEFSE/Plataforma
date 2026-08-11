@@ -8,6 +8,9 @@ import GastoRemIngresoEstablecimiento from './GastoRemIngresoEstablecimiento'
 import AnalisisRendicion from './AnalisisRendicion'
 import SNEDSostenedor from './SNEDSostenedor'
 import SqlViewer from '../../components/SqlViewer'
+import GeoEstablecimiento from './GeoEstablecimiento'
+import ConvivenciaEscolar from './ConvivenciaEscolar'
+import SIMCESostenedor from './SIMCESostenedor'
 
 // ── Catálogo de Widgets fijables al Resumen ────────────────────────────────────
 export const SOSTENEDOR_WIDGETS = [
@@ -302,6 +305,9 @@ const SECTION_TITLES = {
   territorio: { icon: '🗺️', label: 'Territorio — IVE por Establecimiento' },
   presupuesto: { icon: '📐', label: 'Presupuesto Proyectado vs Ejecutado' },
   resumen: { icon: '🗂️', label: 'Resumen Personalizado' },
+  geo_establecimiento: { icon: '📍', label: 'Geo Localización' },
+  convivencia: { icon: '🤝', label: 'Convivencia Escolar' },
+  simce: { icon: '📈', label: 'SIMCE — Tendencia Histórica' },
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -450,12 +456,16 @@ export default function FichaSostenedor({ section = 'perfil' }) {
                 {sec.label} · RUT {perfil.rut_sost} · {perfil.nom_com_sost}, Región {perfil.cod_reg_sost}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
-              <UnitSelector value={unitMode} onChange={setUnitMode} />
-              {/*span style={{ padding: '0.3rem 0.8rem', borderRadius: '999px', background: '#05966922', color: '#34d399', border: '1px solid #059669', fontSize: '0.78rem', fontWeight: 600 }}>
-            ✅ Riesgo Bajo
-          </span>*/}
+            <div id="geo-filters-portal" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {section !== 'geo_establecimiento' && section !== 'simce' && (
+                <>
+                  <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+                  <UnitSelector value={unitMode} onChange={setUnitMode} />
+                </>
+              )}
+              {section === 'simce' && (
+                <UnitSelector value={unitMode} onChange={setUnitMode} />
+              )}
             </div>
           </div>
 
@@ -507,6 +517,18 @@ export default function FichaSostenedor({ section = 'perfil' }) {
               sostId={sostId}
               loadingRbd={loadingRbd}
             />
+          )}
+
+          {section === 'geo_establecimiento' && (
+            <GeoEstablecimiento sostId={sostId} />
+          )}
+
+          {section === 'convivencia' && (
+            <ConvivenciaEscolar sostId={sostId} periodo={periodo} />
+          )}
+
+          {section === 'simce' && (
+            <SIMCESostenedor sostId={sostId} />
           )}
         </div>
       </MoneyFmtCtx.Provider>
