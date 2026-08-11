@@ -112,13 +112,7 @@ const SOSTENEDOR_NAV_GROUPS = [
     exact: true,
     children: [],
   },
-  {
-    path: '/mi-ficha/convivencia',
-    label: 'Convivencia Escolar',
-    icon: '🤝',
-    exact: true,
-    children: [],
-  },
+
   {
     path: '/mi-ficha/simce',
     label: 'SIMCE',
@@ -337,7 +331,7 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/territorio" element={<FichaSostenedor section="territorio" />} />
                 <Route path="/mi-ficha/presupuesto" element={<FichaSostenedor section="presupuesto" />} />
                 <Route path="/mi-ficha/geo-establecimiento" element={<FichaSostenedor section="geo_establecimiento" />} />
-                <Route path="/mi-ficha/convivencia" element={<FichaSostenedor section="convivencia" />} />
+
                 <Route path="/mi-ficha/simce" element={<FichaSostenedor section="simce" />} />
                 <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
               </>
