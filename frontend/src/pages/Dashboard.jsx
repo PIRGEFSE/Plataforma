@@ -18,6 +18,7 @@ import FichaEstablecimiento from './tabs/FichaEstablecimiento'
 import GeoEstablecimiento from './tabs/GeoEstablecimiento'
 
 const NAV_ITEMS = [
+  { path: '/vision-global', label: 'Visión Global', icon: '🌍', roles: ['admin'] },
   { path: '/', label: 'Resumen', icon: '📊', roles: ['admin', 'viewer'] },
   { path: '/tendencia', label: 'Tendencia', icon: '📈', roles: ['admin', 'viewer'] },
   { path: '/subvencion', label: 'Subvenciones', icon: '🏫', roles: ['admin', 'viewer'] },
@@ -44,6 +45,13 @@ const NAV_ITEMS = [
 
 // Estructura jerárquica de navegación para el rol sostenedor
 const SOSTENEDOR_NAV_GROUPS = [
+  {
+    path: '/mi-ficha/geo-establecimiento',
+    label: 'Visión Global',
+    icon: '🌍',
+    exact: true,
+    children: [],
+  },
   {
     path: '/mi-ficha/resumen',
     label: 'Resumen',
@@ -105,13 +113,7 @@ const SOSTENEDOR_NAV_GROUPS = [
       { label: 'Gasto Educativo',       icon: '💰', lsKey: 'pirgefse-fichasost-territorio', lsVal: 'gasto' },
     ],
   },
-  {
-    path: '/mi-ficha/geo-establecimiento',
-    label: 'Geo Localización',
-    icon: '📍',
-    exact: true,
-    children: [],
-  },
+
 
   {
     path: '/mi-ficha/simce',
@@ -315,6 +317,7 @@ export default function Dashboard() {
             <Route path="/riesgo-estructural" element={<RiesgoEstructural />} />
             {user?.role === 'admin' && (
               <>
+                <Route path="/vision-global" element={<GeoEstablecimiento />} />
                 <Route path="/remuneraciones" element={<Remuneraciones />} />
                 <Route path="/estado-resultado" element={<EstadoResultado />} />
                 <Route path="/usuarios" element={<Usuarios />} />

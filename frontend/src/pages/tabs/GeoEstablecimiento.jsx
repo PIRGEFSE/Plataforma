@@ -15,8 +15,8 @@ const DEPE_COLORS = {
   6: '#dc2626', // Otro
 }
 const DEPE_LABELS = {
-  1: 'Municipal', 2: 'Part. Subvencionado', 3: 'Part. Pagado',
-  4: 'Corp. Admin. Delegada', 5: 'SLEP', 6: 'Otro',
+  1: 'Corporación Municipal', 2: 'Municipal DAEM', 3: 'Part. Subvencionado',
+  4: 'Part. Pagado', 5: 'Corp. Admin. Delegada (DL 3166)', 6: 'Servicio Local de Educación (SLEP)',
 }
 
 function depeColor(cod) { return DEPE_COLORS[cod] ?? '#6b7280' }
@@ -62,7 +62,7 @@ function BottomPanel({ data, isSelected }) {
   const [simceGrade, setSimceGrade] = useState('2M')
   if (!data) return null
 
-  const formatM = (v) => v != null ? `$${(v/1e6).toFixed(1)}M` : '—'
+  const formatM = (v) => v != null ? `$${(v / 1e6).toFixed(1)}M` : '—'
   const formatP = (v) => v != null ? `${v.toFixed(1)}%` : '—'
   const formatN = (v) => v != null ? Number(v).toLocaleString('es-CL') : '—'
 
@@ -84,11 +84,11 @@ function BottomPanel({ data, isSelected }) {
           {isSelected ? '📊 Establecimiento Seleccionado' : '🗺️ Resumen Área Visible'}
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
-          <div><b style={{color: 'var(--text-primary)'}}>Matrícula:</b> {formatN(data.matricula)}</div>
-          <div><b style={{color: 'var(--text-primary)'}}>IVE:</b> {formatP(data.ive)}</div>
-          <div><b style={{color: 'var(--text-primary)'}}>Asistencia:</b> {formatP(data.tasa_asistencia)}</div>
-          <div><b style={{color: 'var(--text-primary)'}}>Ingresos:</b> <span style={{ color: '#059669', fontWeight: 600 }}>{formatM(data.ingresos)}</span></div>
-          <div><b style={{color: 'var(--text-primary)'}}>Gastos:</b> <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatM(data.gastos)}</span></div>
+          <div><b style={{ color: 'var(--text-primary)' }}>Matrícula:</b> {formatN(data.matricula)}</div>
+          <div><b style={{ color: 'var(--text-primary)' }}>IVE:</b> {formatP(data.ive * 100)}</div>
+          <div><b style={{ color: 'var(--text-primary)' }}>Asistencia:</b> {formatP(data.tasa_asistencia * 100)}</div>
+          <div><b style={{ color: 'var(--text-primary)' }}>Ingresos:</b> <span style={{ color: '#059669', fontWeight: 600 }}>{formatM(data.ingresos)}</span></div>
+          <div><b style={{ color: 'var(--text-primary)' }}>Gastos:</b> <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatM(data.gastos)}</span></div>
         </div>
       </div>
 
@@ -100,13 +100,13 @@ function BottomPanel({ data, isSelected }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>📈 SIMCE 2024</h4>
           {availableGrades.length > 0 && (
-            <select style={{ ...inputSt, padding: '0.2rem 0.5rem', minWidth: 'auto', fontSize: '0.75rem' }} 
-                    value={gradeToUse} onChange={e => setSimceGrade(e.target.value)}>
+            <select style={{ ...inputSt, padding: '0.2rem 0.5rem', minWidth: 'auto', fontSize: '0.75rem' }}
+              value={gradeToUse} onChange={e => setSimceGrade(e.target.value)}>
               {availableGrades.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           )}
         </div>
-        
+
         {!simceData ? (
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No hay datos SIMCE para esta selección.</div>
         ) : (
@@ -114,33 +114,33 @@ function BottomPanel({ data, isSelected }) {
             {/* Lectura */}
             <div>
               <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>
-                Lectura ({formatN(simceData.nalu_lect)} rinden) <span style={{float:'right', color:'#3b82f6'}}>Prom: {formatN(simceData.prom_lect)}</span>
+                Lectura ({formatN(simceData.nalu_lect)} rinden) <span style={{ float: 'right', color: '#3b82f6' }}>Prom: {formatN(simceData.prom_lect)}</span>
               </div>
               <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'var(--surface-raised)' }}>
-                 {simceData.ins_lect > 0 && <div style={{ width: `${simceData.ins_lect}%`, background: '#ef4444' }} title={`Insuficiente: ${formatP(simceData.ins_lect)}`} />}
-                 {simceData.ele_lect > 0 && <div style={{ width: `${simceData.ele_lect}%`, background: '#f59e0b' }} title={`Elemental: ${formatP(simceData.ele_lect)}`} />}
-                 {simceData.ade_lect > 0 && <div style={{ width: `${simceData.ade_lect}%`, background: '#10b981' }} title={`Adecuado: ${formatP(simceData.ade_lect)}`} />}
+                {simceData.ins_lect > 0 && <div style={{ width: `${simceData.ins_lect}%`, background: '#ef4444' }} title={`Insuficiente: ${formatP(simceData.ins_lect)}`} />}
+                {simceData.ele_lect > 0 && <div style={{ width: `${simceData.ele_lect}%`, background: '#f59e0b' }} title={`Elemental: ${formatP(simceData.ele_lect)}`} />}
+                {simceData.ade_lect > 0 && <div style={{ width: `${simceData.ade_lect}%`, background: '#10b981' }} title={`Adecuado: ${formatP(simceData.ade_lect)}`} />}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                <span style={{color: '#ef4444'}}>{formatP(simceData.ins_lect)} Ins.</span>
-                <span style={{color: '#f59e0b'}}>{formatP(simceData.ele_lect)} Ele.</span>
-                <span style={{color: '#10b981'}}>{formatP(simceData.ade_lect)} Ade.</span>
+                <span style={{ color: '#ef4444' }}>{formatP(simceData.ins_lect)} Ins.</span>
+                <span style={{ color: '#f59e0b' }}>{formatP(simceData.ele_lect)} Ele.</span>
+                <span style={{ color: '#10b981' }}>{formatP(simceData.ade_lect)} Ade.</span>
               </div>
             </div>
             {/* Matemática */}
             <div>
               <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>
-                Matemática ({formatN(simceData.nalu_mate)} rinden) <span style={{float:'right', color:'#3b82f6'}}>Prom: {formatN(simceData.prom_mate)}</span>
+                Matemática ({formatN(simceData.nalu_mate)} rinden) <span style={{ float: 'right', color: '#3b82f6' }}>Prom: {formatN(simceData.prom_mate)}</span>
               </div>
               <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'var(--surface-raised)' }}>
-                 {simceData.ins_mate > 0 && <div style={{ width: `${simceData.ins_mate}%`, background: '#ef4444' }} title={`Insuficiente: ${formatP(simceData.ins_mate)}`} />}
-                 {simceData.ele_mate > 0 && <div style={{ width: `${simceData.ele_mate}%`, background: '#f59e0b' }} title={`Elemental: ${formatP(simceData.ele_mate)}`} />}
-                 {simceData.ade_mate > 0 && <div style={{ width: `${simceData.ade_mate}%`, background: '#10b981' }} title={`Adecuado: ${formatP(simceData.ade_mate)}`} />}
+                {simceData.ins_mate > 0 && <div style={{ width: `${simceData.ins_mate}%`, background: '#ef4444' }} title={`Insuficiente: ${formatP(simceData.ins_mate)}`} />}
+                {simceData.ele_mate > 0 && <div style={{ width: `${simceData.ele_mate}%`, background: '#f59e0b' }} title={`Elemental: ${formatP(simceData.ele_mate)}`} />}
+                {simceData.ade_mate > 0 && <div style={{ width: `${simceData.ade_mate}%`, background: '#10b981' }} title={`Adecuado: ${formatP(simceData.ade_mate)}`} />}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                <span style={{color: '#ef4444'}}>{formatP(simceData.ins_mate)} Ins.</span>
-                <span style={{color: '#f59e0b'}}>{formatP(simceData.ele_mate)} Ele.</span>
-                <span style={{color: '#10b981'}}>{formatP(simceData.ade_mate)} Ade.</span>
+                <span style={{ color: '#ef4444' }}>{formatP(simceData.ins_mate)} Ins.</span>
+                <span style={{ color: '#f59e0b' }}>{formatP(simceData.ele_mate)} Ele.</span>
+                <span style={{ color: '#10b981' }}>{formatP(simceData.ade_mate)} Ade.</span>
               </div>
             </div>
           </div>
@@ -158,9 +158,9 @@ function BottomPanel({ data, isSelected }) {
               🏠 Censo 2024 <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>({data.censo.nivel})</span>
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', fontSize: '0.85rem' }}>
-              <div><b style={{color: 'var(--text-primary)'}}>Personas:</b> {formatN(data.censo.personas)}</div>
-              <div><b style={{color: 'var(--text-primary)'}}>Hogares:</b> {formatN(data.censo.hogares)}</div>
-              <div><b style={{color: 'var(--text-primary)'}}>Viviendas:</b> {formatN(data.censo.viviendas)}</div>
+              <div><b style={{ color: 'var(--text-primary)' }}>Personas:</b> {formatN(data.censo.personas)}</div>
+              <div><b style={{ color: 'var(--text-primary)' }}>Hogares:</b> {formatN(data.censo.hogares)}</div>
+              <div><b style={{ color: 'var(--text-primary)' }}>Viviendas:</b> {formatN(data.censo.viviendas)}</div>
             </div>
           </div>
         </>
@@ -178,7 +178,7 @@ export default function GeoEstablecimiento({ sostId }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [stats, setStats] = useState(null)
-  
+
   const [agregadosArea, setAgregadosArea] = useState(null)
   const [selectedRbd, setSelectedRbd] = useState(null)
   const [agregadosSelected, setAgregadosSelected] = useState(null)
@@ -197,14 +197,14 @@ export default function GeoEstablecimiento({ sostId }) {
   useEffect(() => {
     api.get('/dashboard/geo-establecimientos/filtros').then(r => {
       setRegiones(r.data.regiones ?? [])
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   useEffect(() => {
     if (!regionSel) { setComunas([]); return }
     api.get(`/dashboard/geo-establecimientos/filtros?cod_reg=${regionSel}`).then(r => {
       setComunas(r.data.comunas ?? [])
-    }).catch(() => {})
+    }).catch(() => { })
   }, [regionSel])
 
   // ── Carga de datos GeoJSON ──────────────────────────────────────────────
@@ -401,10 +401,10 @@ export default function GeoEstablecimiento({ sostId }) {
       : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 
     // Capturar posición actual antes del swap de estilo
-    const center  = map.getCenter()
-    const zoom    = map.getZoom()
+    const center = map.getCenter()
+    const zoom = map.getZoom()
     const bearing = map.getBearing()
-    const pitch   = map.getPitch()
+    const pitch = map.getPitch()
 
     map.once('style.load', () => {
       if (!mapRef.current) return
@@ -517,9 +517,9 @@ export default function GeoEstablecimiento({ sostId }) {
 
       {/* Bottom Panel (Agregados / Censo) */}
       {(agregadosArea || agregadosSelected) && (
-        <BottomPanel 
-          data={selectedRbd ? agregadosSelected : agregadosArea} 
-          isSelected={!!selectedRbd} 
+        <BottomPanel
+          data={selectedRbd ? agregadosSelected : agregadosArea}
+          isSelected={!!selectedRbd}
         />
       )}
 

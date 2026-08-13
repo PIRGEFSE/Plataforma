@@ -1,0 +1,62 @@
+Tabla Estado_resultado
+
+En el caso de los Ingresos que no tenga el 3 en su cuenta_alias, la BBDD nos muestra, 191.750 Registros monto declarado con valores negativos y positivos, de los cuales 1.079 aparecen con el desc_estado NO RENDIDO  
+
+901001	AJUSTES POR VALIDACIÓN DE DATOS RC
+910002	AJUSTES POR RECTIFICACIÓN - REIMPUTAR
+920002	AJUSTES POR REVINCULACIÓN EDUCATIVA
+800001	INGRESOS POR RECURSOS CENTRALIZADOS
+910904	OTROS AJUSTES POR RECTIFICACIÓN - INGRESOS
+910003	AJUSTES POR RECTIFICACIÓN - MODIFICAR
+910001	AJUSTES POR RECTIFICACIÓN - AGREGAR
+920001	OTROS AJUSTES
+900001	INGRESOS POR GASTOS NO ACEPTADOS
+500001	SALDO INICIAL
+920001	OTROS AJUSTES
+
+En el caso de los Gastos que no tenga el 4 en su cuenta_alias, la BBDD nos muestra, 29.271 Registros monto rendido solo con valores positivos
+
+700001	EGRESOS POR RECURSOS CENTRALIZADOS
+
+
+Dashboard.py en el backend
+
+1. Perfil / Resumen de Establecimientos
+Tabla Catálogo de Establecimientos: Muestra los campos Ingresos, Gastos y Superávit por cada establecimiento (RBD).
+Endpoint backend: /dashboard/ficha-sostenedor/detalle-rbd
+
+2. Educativo - Financiero
+Ingreso vs Gasto por EE: Compara directamente los ingresos y gastos extraídos de la tabla.
+Superávit / Déficit por EE: Se calcula como la diferencia entre los ingresos y los gastos obtenidos de estado_resultado.
+Módulo SNED: Relaciona los puntajes y el desempeño del Sistema Nacional de Evaluación de Desempeño con los ingresos de cada establecimiento.
+Endpoints backend: /dashboard/ficha-sostenedor/detalle-rbd y /dashboard/sned-sostenedor
+
+3. Eficiencia del Gasto
+Distribución del Gasto (%) y Nivel de Gasto Administrativo: Clasifica los gastos de estado_resultado por categoría.
+KPIs y Tabla de Costo por Alumno: Toma el gasto total proveniente de estado_resultado y lo divide por la matrícula.
+Endpoints backend: /dashboard/ficha-sostenedor/detalle-rbd y /dashboard/eficiencia-gasto
+
+4. Sostenibilidad y Riesgo
+Índice HHI (Distribución, Evolución y Composición): Evalúa la concentración de las fuentes de ingreso consultando los registros de estado_resultado donde desc_tipo_cuenta es de tipo 'ingreso'.
+Acreditación de Saldos: Mide el porcentaje rendido basándose en los "ingresos rendidos" obtenidos de esta tabla.
+Ratio Remuneraciones / Ingresos: Utiliza como denominador los "ingresos rendidos" alojados en la tabla.
+Endpoints backend: /dashboard/hhi-fuentes, /dashboard/hhi-fuentes-sostenedor y /dashboard/ficha-sostenedor/detalle-rbd
+
+5. Comportamiento Financiero
+Gastos Rem. sobre Ingreso Dep.: Al igual que en sostenibilidad, el indicador toma los ingresos rendidos desde estado_resultado como el divisor para este cálculo de comportamiento financiero.
+Endpoints backend: /dashboard/gasto-rem-ingreso y /dashboard/gasto-rem-ingreso-establecimiento
+
+6. Territorio e IVE
+Gasto Educativo (KPIs, Tabla y Gráficos): Relaciona el nivel de complejidad educativa (IVE) de un territorio con los ingresos reportados por el establecimiento.
+Complejidad — IVE vs Ingreso (Scatter): Gráfico de dispersión utilizando el ingreso de la tabla.
+Endpoint backend: /dashboard/ficha-sostenedor/territorio
+
+7. Presupuesto
+Presupuesto Ejecutado: Se obtiene directamente de los ingresos rendidos en la tabla estado_resultado, comparándolo con el presupuesto proyectado.
+Endpoint backend: /dashboard/ficha-sostenedor/presupuesto
+
+8. Convivencia Escolar
+Análisis Cruzado: Cruza la tabla del SIMCE y el índice IVE con los datos de estado_resultado por RBD y año para buscar patrones de financiamiento en contextos de convivencia (aunque esta sección la ocultamos recientemente del menú lateral, el componente backend sigue usando esta consulta).
+Endpoint backend: /dashboard/ficha-sostenedor/convivencia
+
+Conclusión: Cualquier modificación o error en la tabla estado_resultado (o sus vistas materializadas asociadas como mv_estado_resultado) en tu contenedor Docker impactará directamente en todas las vistas numéricas, ratios financieros y de sostenibilidad de la página de la FichaSostenedor.
