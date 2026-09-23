@@ -1,78 +1,129 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef, useContext, createContext } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
-import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
+import { ESTADO_LABELS, ESTADO_COLORS, COLORS_CHART } from '../../lib/edu-constants'
+import {
+  MoneyFmtCtx, useMoneyFmt, KPICard, PeriodoSelector, UnitSelector,
+  BreadcrumbHeader, StickyDashboardHeader, getEnsenanzas, buildMoneyFormatters, fmtN
+} from '../../components/DashboardWidgets'
 
-const RIESGO_COLORS = { 'Riesgo Bajo': '#059669', 'Riesgo Moderado': '#d97706', 'Riesgo Alto': '#dc2626' }
-const EF_COLORS = { Optimo: '#059669', Moderado: '#d97706', Elevado: '#dc2626' }
-const COLORS = ['#2563eb','#059669','#d97706','#0ea5e9','#dc2626','#7c3aed','#0891b2','#ca8a04','#047857','#1d4ed8']
-const ESTADO_LABELS = { 1: 'Funcionando', 2: 'Receso', 3: 'Cerrado' }
-const ESTADO_COLORS = { 1: '#059669', 2: '#d97706', 3: '#64748b' }
+// ── Catálogo de Widgets fijables al Resumen ────────────────────────────────────
+export const ESTABLECIMIENTO_WIDGETS = [
+  { key: 'fin_ingreso_gasto',     label: 'Ingreso vs Gasto (Histórico)',        section: 'financiero', icon: '💵', color: '#1e40af', grupo: 'Financiero' },
+  { key: 'ef_distribucion_gasto', label: 'Distribución del Gasto (%)',          section: 'eficiencia', icon: '📊', color: '#059669', grupo: 'Eficiencia del Gasto' },
+  { key: 'ri_acreditacion',       label: 'Acreditación de Saldos',             section: 'riesgo',     icon: '🛡️', color: '#dc2626', grupo: 'Riesgo' },
+  { key: 'sv_composicion',        label: 'Composición de Subvenciones',        section: 'subvencion', icon: '🏷️', color: '#8b5cf6', grupo: 'Subvenciones' },
+  { key: 'sned_kpis',             label: 'SNED — KPIs del Grupo',              section: 'sned_grupo', icon: '🏆', color: '#1e40af', grupo: 'SNED' },
+  { key: 'sned_tabla',            label: 'SNED — Establecimientos del Grupo',  section: 'sned_grupo', icon: '📋', color: '#3b82f6', grupo: 'SNED' },
+]
 
-const ENS_MAP = {
-  10:{label:'Parvularia',color:'#f472b6'},110:{label:'Básica',color:'#60a5fa'},
-  310:{label:'Media H-C',color:'#34d399'},410:{label:'TP Comercial',color:'#fb923c'},
-  510:{label:'TP Industrial',color:'#facc15'},610:{label:'TP Técnica',color:'#38bdf8'},
-  710:{label:'TP Agrícola',color:'#86efac'},810:{label:'TP Marítima',color:'#67e8f9'},
-  910:{label:'Media Artística',color:'#f9a8d4'},
+const EE_WIDGET_MAP = Object.fromEntries(ESTABLECIMIENTO_WIDGETS.map(w => [w.key, w]))
+
+// ── Hook: usePinnedWidgetsEE ───────────────────────────────────────────────────
+const LS_KEY_EE = 'pirgefse-ee-resumen-pins-cache'
+
+export function usePinnedWidgetsEE() {
+  const [pins, setPins] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY_EE) || '[]') } catch { return [] }
+  })
+  const saving = useRef(false)
+
+  useEffect(() => {
+    api.get('/dashboard/resumen-pins')
+      .then(r => {
+        const serverPins = r.data.pins || []
+        setPins(serverPins)
+        localStorage.setItem(LS_KEY_EE, JSON.stringify(serverPins))
+      })
+      .catch(() => {})
+  }, [])
+
+  const togglePin = useCallback((key) => {
+    setPins(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+      localStorage.setItem(LS_KEY_EE, JSON.stringify(next))
+      if (!saving.current) {
+        saving.current = true
+        api.put('/dashboard/resumen-pins', { pins: next }).finally(() => { saving.current = false })
+      }
+      return next
+    })
+  }, [])
+
+  const isPinned = useCallback((key) => pins.includes(key), [pins])
+  return { pins, isPinned, togglePin }
 }
 
-// tt() se llama dentro de componentes que usan useChartColors — ver uso abajo
+// ── Contexto de Pins ───────────────────────────────────────────────────────────
+export const PinsCtxEE = createContext({ pins: [], isPinned: () => false, togglePin: () => {} })
+export const usePinsEE = () => useContext(PinsCtxEE)
 
-function KPICard({ icon, label, value, color='#2563eb', sub }) {
+// ── WidgetWrapperEE ────────────────────────────────────────────────────────────
+export function WidgetWrapperEE({ widgetKey, children, compact = false }) {
+  const { isPinned, togglePin } = usePinsEE()
+  const pinned = isPinned(widgetKey)
+  const widget = EE_WIDGET_MAP[widgetKey]
   return (
-    <div className="kpi-card" style={{'--accent':color}}>
-      <div className="kpi-icon" style={{background:`${color}20`}}>{icon}</div>
-      <div className="kpi-body">
-        <div className="kpi-value" style={{color}}>{value}</div>
-        <div className="kpi-label">{label}</div>
-        {sub && <div className="kpi-sub">{sub}</div>}
-      </div>
-    </div>
-  )
-}
-
-function getEnsenanzas(ee) {
-  const claves = ['ens_01','ens_02','ens_03','ens_04','ens_05','ens_06','ens_07','ens_08','ens_09','ens_10','ens_11']
-  const unicos = [...new Set(claves.map(k => Number(ee[k]??0)).filter(c=>c>0))]
-  if (!unicos.length) return <span style={{color:'var(--text-disabled)'}}>—</span>
-  return (
-    <div style={{display:'flex',flexWrap:'wrap',gap:'0.2rem'}}>
-      {unicos.map(cod => {
-        const e = ENS_MAP[cod]; const lbl = e?.label??`Cod ${cod}`; const clr = e?.color??'var(--text-secondary)'
-        return <span key={cod} style={{fontSize:'0.65rem',fontWeight:600,color:'#fff',background:clr,borderRadius:999,padding:'0.1rem 0.4rem'}}>{lbl}</span>
-      })}
+    <div style={{ position: 'relative', marginBottom: compact ? '0' : '1.25rem' }}>
+      <button
+        onClick={() => togglePin(widgetKey)}
+        title={pinned ? 'Quitar del Resumen' : 'Agregar al Resumen'}
+        style={{
+          position: 'absolute', top: '0.6rem', right: '0.75rem', zIndex: 10,
+          display: 'flex', alignItems: 'center', gap: '0.3rem',
+          padding: '0.25rem 0.65rem', borderRadius: '999px',
+          border: pinned ? `1.5px solid ${widget?.color ?? '#6366f1'}` : '1.5px solid var(--line-subtle)',
+          background: pinned ? `${widget?.color ?? '#6366f1'}18` : 'var(--surface-overlay)',
+          color: pinned ? (widget?.color ?? '#6366f1') : 'var(--text-muted)',
+          fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+          transition: 'all 0.18s', whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ fontSize: '0.85rem' }}>📌</span>
+        {pinned ? 'En Resumen' : 'Agregar al Resumen'}
+      </button>
+      {children}
     </div>
   )
 }
 
 const SECTION_TITLES = {
-  perfil:     { icon:'🏫', label:'Mi Establecimiento' },
-  financiero: { icon:'💵', label:'Financiero — Serie Temporal' },
-  eficiencia: { icon:'⚙️', label:'Eficiencia del Gasto — Serie Temporal' },
-  riesgo:     { icon:'📊', label:'Riesgo — Acreditación de Saldos' },
-  subvencion: { icon:'🏷️', label:'Subvenciones' },
+  perfil:     { icon: '🏫', label: 'Mi Establecimiento' },
+  financiero: { icon: '💵', label: 'Financiero — Serie Temporal' },
+  eficiencia: { icon: '⚙️', label: 'Eficiencia del Gasto' },
+  riesgo:     { icon: '📊', label: 'Riesgo — Acreditación de Saldos' },
+  subvencion: { icon: '🏷️', label: 'Subvenciones' },
+  sned_grupo: { icon: '🏆', label: 'Grupo Homogéneo SNED' },
+  resumen:    { icon: '🗂️', label: 'Resumen Personalizado' },
 }
 
-export default function FichaEstablecimiento({ section='perfil' }) {
+export default function FichaEstablecimiento({ section = 'perfil' }) {
   const { user } = useAuth()
   const rbdId = user?.rbd_id || 2979
+  const pinsCtx = usePinnedWidgetsEE()
 
   const [perfil, setPerfil]           = useState(null)
   const [detalleData, setDetalleData] = useState(null)
   const [subvData, setSubvData]       = useState([])
-  const [periodos, setPeriodos]       = useState([2020,2021,2022,2023,2024])
-  const [periodo, setPeriodo]         = useState('')
+  const [snedData, setSnedData]       = useState(null)
+  const [periodos, setPeriodos]       = useState([2020, 2021, 2022, 2023, 2024])
+  const [periodo, setPeriodo]         = useState(2024)
+  const [unitMode, setUnitMode]       = useState('mM')
   const [loading, setLoading]         = useState(true)
 
+  const { fmtAmt, fmtAxisAmt, unitLabel } = buildMoneyFormatters(unitMode)
+
   useEffect(() => {
-    api.get(`/dashboard/ficha-rbd?rbd=${rbdId}&periodo=2024`).then(r => {
+    setLoading(true)
+    api.get(`/dashboard/ficha-rbd?rbd=${rbdId}&periodo=${periodo}`).then(r => {
       setPerfil(r.data.perfil)
-      if (r.data.periodos_disponibles?.length) setPeriodos(r.data.periodos_disponibles.sort((a,b)=>b-a))
+      if (r.data.periodos_disponibles?.length) {
+        setPeriodos(prev => [...new Set([...r.data.periodos_disponibles, ...prev])].sort((a, b) => b - a))
+      }
     }).finally(() => setLoading(false))
-  }, [rbdId])
+  }, [rbdId, periodo])
 
   const fetchDetalle = useCallback(() => {
     api.get(`/dashboard/ficha-rbd/detalle?rbd=${rbdId}`).then(r => setDetalleData(r.data))
@@ -81,113 +132,125 @@ export default function FichaEstablecimiento({ section='perfil' }) {
   useEffect(() => { fetchDetalle() }, [fetchDetalle])
 
   useEffect(() => {
-    const p = periodo ? `&periodo=${periodo}` : ''
-    api.get(`/dashboard/subvencion-rbd?rbd=${rbdId}${p}`).then(r => setSubvData(r.data))
-  }, [rbdId, periodo])
+    if (section === 'subvencion') {
+      const p = periodo ? `&periodo=${periodo}` : ''
+      api.get(`/dashboard/subvencion-rbd?rbd=${rbdId}${p}`).then(r => setSubvData(r.data))
+    }
+  }, [rbdId, periodo, section])
+
+  useEffect(() => {
+    if (section === 'sned_grupo' || section === 'financiero') {
+      api.get(`/dashboard/ficha-rbd/sned-grupo?rbd=${rbdId}&periodo=${periodo}`)
+        .then(r => setSnedData(r.data))
+    }
+  }, [rbdId, periodo, section])
 
   const sec = SECTION_TITLES[section] ?? SECTION_TITLES.perfil
-  if (loading) return <div className="tab-page"><div className="loading-area"><div className="spinner"/></div></div>
+
+  if (loading || !perfil) return (
+    <div className="tab-page">
+      <StickyDashboardHeader title={`${sec.icon} Cargando...`} />
+      <div className="loading-area"><div className="spinner" /></div>
+    </div>
+  )
 
   return (
-    <div className="tab-page">
-      <div className="tab-header">
-        <div>
-          <h2 className="tab-title">{sec.icon} {perfil?.nom_rbd ?? `RBD ${rbdId}`}</h2>
-          <p className="tab-subtitle">
-            {sec.label} · RBD {rbdId}
-            {perfil && ` · ${perfil.nombre_sostenedor ?? ''}`}
-          </p>
-        </div>
-        <div style={{display:'flex',gap:'0.5rem',alignItems:'center',flexWrap:'wrap'}}>
-          {section === 'subvencion' && (
-            <>
-              <span style={{color:'var(--text-muted)',fontSize:'0.82rem'}}>Año:</span>
-              <select className="filter-select" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={{minWidth:100}}>
-                <option value="">Todos</option>
-                {periodos.map(p=><option key={p} value={p}>{p}</option>)}
-              </select>
-            </>
-          )}
-          {perfil && (
-            <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-strong)',fontSize:'0.78rem',fontWeight:600}}>
+    <PinsCtxEE.Provider value={pinsCtx}>
+      <MoneyFmtCtx.Provider value={{ fmtAmt, fmtAxisAmt, unitLabel }}>
+        <div className="tab-page">
+          <StickyDashboardHeader
+            title={`${sec.icon} ${perfil?.nom_rbd ?? `RBD ${rbdId}`}`}
+            subtitle={`${sec.label} · RBD ${rbdId}${perfil.nombre_sostenedor ? ` · ${perfil.nombre_sostenedor}` : ''}`}
+          >
+            {section !== 'sned_grupo' && section !== 'subvencion' && section !== 'resumen' && (
+              <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+            )}
+            {section !== 'perfil' && section !== 'sned_grupo' && section !== 'subvencion' && section !== 'resumen' && (
+              <UnitSelector value={unitMode} onChange={setUnitMode} />
+            )}
+            <span style={{ padding: '0.3rem 0.8rem', borderRadius: 999, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--line-strong)', fontSize: '0.78rem', fontWeight: 600 }}>
               🏫 RBD {rbdId}
             </span>
-          )}
-          {perfil?.rural_rbd && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--warning-dim)',color:'var(--warning-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🌿 Rural</span>}
-          {perfil?.convenio_pie && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🔵 PIE</span>}
-          {perfil?.pace && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'rgba(139,92,246,0.10)',color:'#a78bfa',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🎓 PACE</span>}
-        </div>
-      </div>
+            {perfil?.rural_rbd && <span style={{ padding: '0.3rem 0.8rem', borderRadius: 999, background: 'var(--warning-dim)', color: 'var(--warning-text)', border: '1px solid var(--line-default)', fontSize: '0.78rem', fontWeight: 600 }}>🌿 Rural</span>}
+            {perfil?.convenio_pie && <span style={{ padding: '0.3rem 0.8rem', borderRadius: 999, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--line-default)', fontSize: '0.78rem', fontWeight: 600 }}>🔵 PIE</span>}
+            {perfil?.pace && <span style={{ padding: '0.3rem 0.8rem', borderRadius: 999, background: 'rgba(139,92,246,0.10)', color: '#a78bfa', border: '1px solid var(--line-default)', fontSize: '0.78rem', fontWeight: 600 }}>🎓 PACE</span>}
+          </StickyDashboardHeader>
 
-      {section === 'perfil'     && <TabPerfil perfil={perfil} detalleData={detalleData} />}
-      {section === 'financiero' && <TabFinanciero detalleData={detalleData} />}
-      {section === 'eficiencia' && <TabEficiencia detalleData={detalleData} />}
-      {section === 'riesgo'     && <TabRiesgo detalleData={detalleData} />}
-      {section === 'subvencion' && <TabSubvencion data={subvData} periodo={periodo} />}
-    </div>
+          {section === 'perfil'     && <TabPerfil perfil={perfil} detalleData={detalleData} periodo={periodo} />}
+          {section === 'financiero' && <TabFinanciero detalleData={detalleData} snedData={snedData} periodo={periodo} />}
+          {section === 'eficiencia' && <TabEficiencia detalleData={detalleData} />}
+          {section === 'riesgo'     && <TabRiesgo detalleData={detalleData} />}
+          {section === 'subvencion' && <TabSubvencion data={subvData} periodo={periodo} />}
+          {section === 'sned_grupo' && <TabGrupoSNED snedData={snedData} periodo={periodo} />}
+          {section === 'resumen'    && <TabResumenEstablecimiento detalleData={detalleData} periodo={periodo} />}
+        </div>
+      </MoneyFmtCtx.Provider>
+    </PinsCtxEE.Provider>
   )
 }
 
-// ── Tab: Perfil ───────────────────────────────────────────────────────────────
-function TabPerfil({ perfil, detalleData }) {
-  if (!perfil) return <div className="loading-area"><div className="spinner"/></div>
+// ── Tab: Perfil ────────────────────────────────────────────────────────────────
+function TabPerfil({ perfil, detalleData, periodo }) {
+  const { fmtAmt } = useContext(MoneyFmtCtx)
+  if (!perfil) return <div className="loading-area"><div className="spinner" /></div>
   const finUlt = detalleData?.financiero_serie?.slice(-1)[0]
   const estado = ESTADO_LABELS[perfil.estado_estab] ?? '—'
   const estadoColor = ESTADO_COLORS[perfil.estado_estab] ?? '#64748b'
 
   return (
     <>
-      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#1d4ed8"/>
-        <KPICard icon="📈" label="Último Ingreso" value={finUlt ? fmtMM(finUlt.ingreso) : '—'} color="#1e40af" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
-        <KPICard icon="📉" label="Último Gasto" value={finUlt ? fmtMM(finUlt.gasto) : '—'} color="#3b82f6" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
-        <KPICard icon="⚖️" label="Superávit" value={finUlt ? fmtMM(finUlt.superavit) : '—'} color={finUlt && finUlt.superavit>=0 ? '#059669':'#dc2626'}/>
+      <BreadcrumbHeader mainLabel="Mi Establecimiento" mainIcon="🏫" subLabel={`Perfil ${periodo}`} subIcon="📄" />
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#1d4ed8" />
+        <KPICard icon="📈" label="Último Ingreso" value={finUlt ? fmtAmt(finUlt.ingreso) : '—'} color="#1e40af" sub={finUlt ? `Año ${finUlt.periodo}` : ''} />
+        <KPICard icon="📉" label="Último Gasto" value={finUlt ? fmtAmt(finUlt.gasto) : '—'} color="#3b82f6" sub={finUlt ? `Año ${finUlt.periodo}` : ''} />
+        <KPICard icon="⚖️" label="Superávit" value={finUlt ? fmtAmt(finUlt.superavit) : '—'} color={finUlt && finUlt.superavit >= 0 ? '#059669' : '#dc2626'} />
       </div>
-      <div className="chart-card" style={{marginBottom:'1.5rem'}}>
+      <div className="chart-card" style={{ marginBottom: '1.5rem' }}>
         <h3 className="chart-title">Datos del Establecimiento</h3>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginTop:'0.75rem'}}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '1rem', marginTop: '0.75rem' }}>
           {[
-            {label:'RBD',val:perfil.rbd,icon:'🔢'},
-            {label:'Nombre',val:perfil.nom_rbd,icon:'🏫'},
-            {label:'Estado',val:<span style={{color:estadoColor,fontWeight:600}}>{estado}</span>,icon:'📌'},
-            {label:'Matrícula Activa',val:perfil.matricula ? 'Sí' : 'No',icon:'✅'},
-            {label:'Sostenedor',val:perfil.nombre_sostenedor,icon:'🏢'},
-            {label:'RUT Sostenedor',val:perfil.rut_sostenedor,icon:'🔑'},
-            {label:'Rural',val:perfil.rural_rbd?'Sí':'No',icon:'🌿'},
-            {label:'Convenio PIE',val:perfil.convenio_pie?'Sí':'No',icon:'🔵'},
-            {label:'PACE',val:perfil.pace?'Sí':'No',icon:'🎓'},
-          ].map(({label,val,icon})=>(
-            <div key={label} style={{background:'var(--surface-overlay)',borderRadius:'0.5rem',padding:'0.75rem',border:'1px solid var(--line-subtle)'}}>
-              <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.25rem'}}>{icon} {label}</div>
-              <div style={{color:'var(--text-primary)',fontWeight:600,fontSize:'0.9rem'}}>{val||'—'}</div>
+            { label: 'RBD', val: perfil.rbd, icon: '🔢' },
+            { label: 'Nombre', val: perfil.nom_rbd, icon: '🏫' },
+            { label: 'Estado', val: <span style={{ color: estadoColor, fontWeight: 600 }}>{estado}</span>, icon: '📌' },
+            { label: 'Matrícula Activa', val: perfil.matricula ? 'Sí' : 'No', icon: '✅' },
+            { label: 'Sostenedor', val: perfil.nombre_sostenedor, icon: '🏢' },
+            { label: 'RUT Sostenedor', val: perfil.rut_sostenedor, icon: '🔑' },
+            { label: 'Rural', val: perfil.rural_rbd ? 'Sí' : 'No', icon: '🌿' },
+            { label: 'Convenio PIE', val: perfil.convenio_pie ? 'Sí' : 'No', icon: '🔵' },
+            { label: 'PACE', val: perfil.pace ? 'Sí' : 'No', icon: '🎓' },
+          ].map(({ label, val, icon }) => (
+            <div key={label} style={{ background: 'var(--surface-overlay)', borderRadius: '0.5rem', padding: '0.75rem', border: '1px solid var(--line-subtle)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{icon} {label}</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9rem' }}>{val || '—'}</div>
             </div>
           ))}
         </div>
-        <div style={{marginTop:'1rem'}}>
-          <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.4rem'}}>🎓 Tipos de Enseñanza</div>
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>🎓 Tipos de Enseñanza</div>
           {getEnsenanzas(perfil)}
         </div>
       </div>
       {detalleData?.financiero_serie?.length > 0 && (
         <div className="chart-card">
-          <h3 className="chart-title">Resumen Financiero por Año</h3>
-          <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+          <h3 className="chart-title">Resumen Financiero Histórico</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
-                <tr style={{background:'var(--surface-overlay)'}}>
-                  {['Año','Ingresos','Gastos','Superávit'].map(h=>(
-                    <th key={h} style={{padding:'0.6rem 1rem',color:'var(--text-muted)',fontWeight:600,textAlign:'right',borderBottom:'1px solid var(--line-default)'}}>{h}</th>
+                <tr style={{ background: 'var(--surface-overlay)' }}>
+                  {['Año', 'Ingresos', 'Gastos', 'Superávit'].map(h => (
+                    <th key={h} style={{ padding: '0.6rem 1rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right', borderBottom: '1px solid var(--line-default)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[...detalleData.financiero_serie].reverse().map((r,i)=>(
-                  <tr key={r.periodo} style={{borderBottom:'1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                    <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{r.periodo}</td>
-                    <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{fmtMM(r.ingreso)}</td>
-                    <td style={{padding:'0.5rem 1rem',color:'var(--danger)',textAlign:'right'}}>{fmtMM(r.gasto)}</td>
-                    <td style={{padding:'0.5rem 1rem',textAlign:'right'}}>
-                      <strong style={{color:Number(r.superavit)>=0?'var(--success)':'var(--danger)'}}>{fmtMM(r.superavit)}</strong>
+                {[...detalleData.financiero_serie].reverse().map((r, i) => (
+                  <tr key={r.periodo} style={{ borderBottom: '1px solid var(--line-subtle)', background: i % 2 === 0 ? 'transparent' : 'var(--surface-overlay)' }}>
+                    <td style={{ padding: '0.5rem 1rem', color: 'var(--text-secondary)', textAlign: 'right' }}>{r.periodo}</td>
+                    <td style={{ padding: '0.5rem 1rem', color: 'var(--success)', textAlign: 'right' }}>{fmtAmt(r.ingreso)}</td>
+                    <td style={{ padding: '0.5rem 1rem', color: 'var(--danger)', textAlign: 'right' }}>{fmtAmt(r.gasto)}</td>
+                    <td style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>
+                      <strong style={{ color: Number(r.superavit) >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtAmt(r.superavit)}</strong>
                     </td>
                   </tr>
                 ))}
@@ -200,296 +263,485 @@ function TabPerfil({ perfil, detalleData }) {
   )
 }
 
-// ── Tab: Financiero (serie temporal) ─────────────────────────────────────────
-function TabFinanciero({ detalleData }) {
-  if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
-  const C = useChartColors()
-  const { financiero_serie=[], remuneraciones_serie=[] } = detalleData
-  const periodos = financiero_serie.map(d=>String(d.periodo))
-
-  const barOption = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
-      formatter: params => {
-        const p = params[0]?.axisValue
-        const d = financiero_serie.find(r=>String(r.periodo)===p)
-        if(!d) return p
-        return `<b>${p}</b><br/>📈 Ingreso: ${fmtMM(d.ingreso)}<br/>📉 Gasto: ${fmtMM(d.gasto)}<br/>⚖️ Superávit: <b>${fmtMM(d.superavit)}</b>`
-      }
-    },
-    legend:{ data:['Ingreso','Gasto'], textStyle:{color:C.legend.color}, top:0 },
-    grid:{ left:80, right:30, top:40, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[
-      { name:'Ingreso', type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.ingreso)), itemStyle:{color:'#059669',borderRadius:[4,4,0,0]} },
-      { name:'Gasto',   type:'bar', barMaxWidth:40, data:financiero_serie.map(d=>Number(d.gasto)),   itemStyle:{color:'#dc2626',borderRadius:[4,4,0,0]} },
-    ],
-    backgroundColor:'transparent',
-  }
-
-  const superavitOption = {
-    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=financiero_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Superávit: <b>${fmtMM(d.superavit)}</b>`:'' } },
-    grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[{ type:'bar', barMaxWidth:40,
-      data:financiero_serie.map(d=>({ value:Number(d.superavit), itemStyle:{color:Number(d.superavit)>=0?'#059669':'#dc2626',borderRadius:[4,4,0,0]} })),
-      markLine:{ silent:true, data:[{xAxis:0,lineStyle:{color:'#475569',type:'dashed'}}] },
-    }],
-    backgroundColor:'transparent',
-  }
-
-  const remOption = remuneraciones_serie.length ? {
-    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=remuneraciones_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>Funcionarios: ${fmtN(d.funcionarios)}<br/>Líq. Total: ${fmtMM(d.total_liquido)}<br/>Promedio: $${fmtN(d.promedio_liquido)}`:'' } },
-    grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:remuneraciones_serie.map(d=>String(d.periodo)), axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', axisLabel:{color:C.axisLabel, formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[{ type:'bar', barMaxWidth:40, data:remuneraciones_serie.map(d=>Number(d.total_liquido)), itemStyle:{color:'#d97706',borderRadius:[4,4,0,0]},
-      label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10, color:'#fcd34d'},
-    }],
-    backgroundColor:'transparent',
-  } : null
-
-  const ult = financiero_serie.slice(-1)[0]
-  const totalIng = financiero_serie.reduce((s,d)=>s+Number(d.ingreso),0)
-  const totalGas = financiero_serie.reduce((s,d)=>s+Number(d.gasto),0)
-
+// ── Tab: Financiero (con sub-tabs: Ingreso vs Gasto | SNED) ────────────────────
+function TabFinanciero({ detalleData, snedData, periodo }) {
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-ee-financiero') || 'ingreso_gasto')
+  useEffect(() => { localStorage.setItem('pirgefse-ee-financiero', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-ee-financiero') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+  const SUB_TABS = [
+    { key: 'ingreso_gasto', label: 'Ingreso vs Gasto', icon: '💵' },
+    { key: 'sned', label: 'SNED', icon: '🏆' },
+  ]
+  const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
   return (
-    <>
-      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="📈" label="Total Ingresos (histórico)" value={fmtMM(totalIng)} color="#1e40af"/>
-        <KPICard icon="📉" label="Total Gastos (histórico)" value={fmtMM(totalGas)} color="#3b82f6"/>
-        <KPICard icon="⚖️" label="Superávit Acumulado" value={fmtMM(totalIng-totalGas)} color={totalIng-totalGas >= 0 ? '#059669' : '#dc2626'}/>
-        <KPICard icon="📅" label={`Ingreso ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.ingreso):'—'} color="#2563eb"/>
-      </div>
-      <div className="chart-card" style={{marginBottom:'1.25rem'}}>
-        <h3 className="chart-title">Ingreso vs Gasto por Año (mM$)</h3>
-        <ReactECharts option={barOption} style={{height:320}}/>
-      </div>
-      <div className="chart-card" style={{marginBottom:'1.25rem'}}>
-        <h3 className="chart-title">Superávit / Déficit por Año (mM$)</h3>
-        <ReactECharts option={superavitOption} style={{height:280}}/>
-      </div>
-      {remOption && (
-        <div className="chart-card">
-          <h3 className="chart-title">Remuneraciones Líquidas por Año (mM$)</h3>
-          <ReactECharts option={remOption} style={{height:280}}/>
-        </div>
+    <div>
+      <BreadcrumbHeader mainLabel="Educativo - Financiero" mainIcon="📊" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      {subTab === 'ingreso_gasto' && (
+        <WidgetWrapperEE widgetKey="fin_ingreso_gasto">
+          <FinancieroChart detalleData={detalleData} />
+        </WidgetWrapperEE>
       )}
-    </>
+      {subTab === 'sned' && (
+        <TabGrupoSNED snedData={snedData} periodo={periodo} />
+      )}
+    </div>
   )
 }
 
-// ── Tab: Eficiencia (serie temporal) ─────────────────────────────────────────
+function FinancieroChart({ detalleData }) {
+  const C = useChartColors()
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useContext(MoneyFmtCtx)
+  const serie = detalleData?.financiero_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos financieros.</div>
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      let sup = 0
+      params.forEach(p => { html += `${p.marker} ${p.seriesName}: <b>${fmtAmt(p.value)}</b><br/>`; if (p.seriesName === 'Ingreso') sup += p.value; if (p.seriesName === 'Gasto') sup -= p.value })
+      html += `<hr style="margin:4px 0;border-color:var(--line-subtle)"/>Superávit: <b style="color:${sup >= 0 ? '#10b981' : '#ef4444'}">${fmtAmt(sup)}</b>`
+      return html
+    }},
+    legend: { data: ['Ingreso', 'Gasto'], textStyle: { color: C.axisLabel } },
+    color: ['#1e40af', '#3b82f6'],
+    grid: { left: 80, right: 20, bottom: 40, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: 'Ingreso', type: 'bar', data: serie.map(d => Number(d.ingreso)), barMaxWidth: 40, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+      { name: 'Gasto', type: 'bar', data: serie.map(d => Number(d.gasto)), barMaxWidth: 40, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+    ],
+    backgroundColor: 'transparent',
+  }
+  return (
+    <div className="chart-card">
+      <h3 className="chart-title">Evolución Ingreso vs Gasto ({unitLabel})</h3>
+      <ReactECharts option={option} style={{ height: 400 }} />
+    </div>
+  )
+}
+
+// ── Tab: Eficiencia (con sub-tabs) ─────────────────────────────────────────────
 function TabEficiencia({ detalleData }) {
-  if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
-  const C = useChartColors()
-  const { eficiencia_serie=[] } = detalleData
-  const periodos = eficiencia_serie.map(d=>String(d.periodo))
-
-  const pct100Option = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
-      formatter:params=>{
-        const d=eficiencia_serie[params[0]?.dataIndex]
-        if(!d) return ''
-        return `<b>${d.periodo}</b><br/><span style="color:#10b981">■</span> Aula: ${d.pct_aula}%<br/><span style="color:#ef4444">■</span> Admin: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}<br/><span style="color:#f59e0b">■</span> Otros: ${d.pct_otros}%`
-      }
-    },
-    legend:{ data:['Gasto en Aula','Gasto Administrativo','Otros Gastos'], textStyle:{color:C.legend.color}, top:0 },
-    grid:{ left:60, right:30, top:50, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[
-      { name:'Gasto en Aula',        type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_aula),  itemStyle:{color:'#059669'} },
-      { name:'Gasto Administrativo', type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_admin), itemStyle:{color:'#dc2626'} },
-      { name:'Otros Gastos',         type:'bar', stack:'pct', barMaxWidth:60, data:eficiencia_serie.map(d=>d.pct_otros), itemStyle:{color:'#d97706'} },
-    ],
-    backgroundColor:'transparent',
-  }
-
-  const adminOption = {
-    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=eficiencia_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>% Administrativo: <b>${d.pct_admin}%</b> — ${d.nivel_eficiencia}`:'' } },
-    grid:{ left:60, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[{ type:'bar', barMaxWidth:60,
-      data:eficiencia_serie.map(d=>({ value:d.pct_admin, itemStyle:{color:EF_COLORS[d.nivel_eficiencia]??'#94a3b8',borderRadius:[4,4,0,0]} })),
-      markLine:{ silent:true, data:[
-        { yAxis:15, lineStyle:{color:'#10b981',type:'dashed'}, label:{formatter:'15% Óptimo',color:'#10b981',fontSize:10} },
-        { yAxis:25, lineStyle:{color:'#f59e0b',type:'dashed'}, label:{formatter:'25% Límite',color:'#f59e0b',fontSize:10} },
-      ]},
-    }],
-    backgroundColor:'transparent',
-  }
-
-  const promAdmin = eficiencia_serie.length ? eficiencia_serie.reduce((s,d)=>s+(d.pct_admin||0),0)/eficiencia_serie.length : 0
-  const ult = eficiencia_serie.slice(-1)[0]
-
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-ee-eficiencia') || 'distribucion')
+  useEffect(() => { localStorage.setItem('pirgefse-ee-eficiencia', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-ee-eficiencia') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+  const SUB_TABS = [{ key: 'distribucion', label: 'Distribución del Gasto', icon: '📊' }]
+  const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
   return (
-    <>
-      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="📊" label="Prom. Gasto Admin (histórico)" value={`${promAdmin.toFixed(1)}%`} color={promAdmin<=15?'#10b981':promAdmin<=25?'#f59e0b':'#ef4444'}/>
-        <KPICard icon="⚙️" label={`Gasto Admin ${ult?.periodo??'—'}`} value={ult?`${ult.pct_admin}%`:'—'} color={ult?EF_COLORS[ult.nivel_eficiencia]:'#94a3b8'} sub={ult?.nivel_eficiencia}/>
-        <KPICard icon="🟢" label={`Gasto en Aula ${ult?.periodo??'—'}`} value={ult?`${ult.pct_aula}%`:'—'} color="#10b981"/>
-        <KPICard icon="💰" label={`Total Gasto ${ult?.periodo??'—'}`} value={ult?fmtMM(ult.total_gasto):'—'} color="#2563eb"/>
-      </div>
-      <div className="chart-card" style={{marginBottom:'1.25rem'}}>
-        <h3 className="chart-title">Distribución del Gasto por Categoría (%) por Año</h3>
-        <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
-          <span style={{color:'#10b981'}}>■</span> Aula &nbsp;<span style={{color:'#ef4444'}}>■</span> Administrativo &nbsp;<span style={{color:'#f59e0b'}}>■</span> Otros
-        </p>
-        <ReactECharts option={pct100Option} style={{height:320}}/>
-      </div>
-      <div className="chart-card">
-        <h3 className="chart-title">Nivel de Gasto Administrativo por Año (%)</h3>
-        <ReactECharts option={adminOption} style={{height:280}}/>
-      </div>
-    </>
+    <div>
+      <BreadcrumbHeader mainLabel="Eficiencia del Gasto" mainIcon="⚙️" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      {subTab === 'distribucion' && (
+        <WidgetWrapperEE widgetKey="ef_distribucion_gasto">
+          <EficienciaChart detalleData={detalleData} />
+        </WidgetWrapperEE>
+      )}
+    </div>
   )
 }
 
-// ── Tab: Riesgo (serie temporal) ─────────────────────────────────────────────
+function EficienciaChart({ detalleData }) {
+  const C = useChartColors()
+  const { unitLabel } = useContext(MoneyFmtCtx)
+  const serie = detalleData?.eficiencia_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos de eficiencia.</div>
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      params.forEach(p => { html += `${p.marker} ${p.seriesName}: <b>${p.value}%</b><br/>` })
+      return html
+    }},
+    legend: { data: ['% Aula', '% Admin', '% Otros'], textStyle: { color: C.axisLabel }, bottom: 0 },
+    color: ['#059669', '#d97706', '#64748b'],
+    grid: { left: 40, right: 20, bottom: 60, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: '% Aula', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_aula)), barMaxWidth: 60 },
+      { name: '% Admin', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_admin)), barMaxWidth: 60 },
+      { name: '% Otros', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_otros)), barMaxWidth: 60, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+    ],
+    backgroundColor: 'transparent',
+  }
+  return (
+    <div className="chart-card">
+      <h3 className="chart-title">Distribución del Gasto (%)</h3>
+      <ReactECharts option={option} style={{ height: 400 }} />
+    </div>
+  )
+}
+
+// ── Tab: Riesgo (con sub-tabs) ─────────────────────────────────────────────────
 function TabRiesgo({ detalleData }) {
-  if (!detalleData) return <div className="loading-area"><div className="spinner"/></div>
-  const C = useChartColors()
-  const { acreditacion_serie=[] } = detalleData
-  const periodos = acreditacion_serie.map(d=>String(d.periodo))
-
-  const acredOption = {
-    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'}, ...C.tooltip,
-      formatter:params=>{
-        const d=acreditacion_serie[params[0]?.dataIndex]
-        if(!d) return ''
-        return `<b>${d.periodo}</b><br/>✅ Rendido: ${Number(d.pct_rendido).toFixed(1)}% (${fmtMM(d.monto_rendido)})<br/>❌ No rendido: ${Number(d.pct_no_rendido).toFixed(1)}% (${fmtMM(d.monto_no_rendido)})<br/>Docs: ${d.total_docs} — <b>${d.nivel_riesgo}</b>`
-      }
-    },
-    legend:{ data:['% Rendido','% No Rendido'], textStyle:{color:C.legend.color}, top:0 },
-    grid:{ left:60, right:30, top:50, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', max:100, axisLabel:{color:C.axisLabel,formatter:v=>`${v}%`}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[
-      { name:'% Rendido',    type:'bar', stack:'pct', barMaxWidth:60, data:acreditacion_serie.map(d=>({ value:Number(d.pct_rendido), itemStyle:{color:RIESGO_COLORS[d.nivel_riesgo]??'#10b981'} })) },
-      { name:'% No Rendido', type:'bar', stack:'pct', barMaxWidth:60, data:acreditacion_serie.map(d=>Number(d.pct_no_rendido)), itemStyle:{color:C.splitLine} },
-    ],
-    backgroundColor:'transparent',
-  }
-
-  const montoOption = {
-    tooltip:{ trigger:'axis', ...C.tooltip, formatter:params=>{ const d=acreditacion_serie[params[0]?.dataIndex]; return d?`<b>${d.periodo}</b><br/>No rendido: <b style="color:#ef4444">${fmtMM(d.monto_no_rendido)}</b><br/>Total: ${fmtMM(d.monto_total)}`:'' } },
-    grid:{ left:80, right:30, top:20, bottom:30 },
-    xAxis:{ type:'category', data:periodos, axisLabel:{color:C.axisLabel} },
-    yAxis:{ type:'value', axisLabel:{color:C.axisLabel,formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    series:[{ type:'bar', barMaxWidth:60,
-      data:acreditacion_serie.map(d=>({ value:Number(d.monto_no_rendido), itemStyle:{color:RIESGO_COLORS[d.nivel_riesgo]??'#ef4444',borderRadius:[4,4,0,0]} })),
-      label:{show:true, position:'top', formatter:p=>fmtMM(p.value), fontSize:10},
-    }],
-    backgroundColor:'transparent',
-  }
-
-  const ult = acreditacion_serie.slice(-1)[0]
-  const totalNR = acreditacion_serie.reduce((s,d)=>s+Number(d.monto_no_rendido),0)
-
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-ee-riesgo') || 'acreditacion')
+  useEffect(() => { localStorage.setItem('pirgefse-ee-riesgo', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-ee-riesgo') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+  const SUB_TABS = [{ key: 'acreditacion', label: 'Acreditación de Saldos', icon: '🛡️' }]
+  const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
   return (
-    <>
-      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="📊" label={`Nivel de Riesgo ${ult?.periodo??'—'}`} value={ult?.nivel_riesgo??'—'} color={ult?RIESGO_COLORS[ult.nivel_riesgo]:'#94a3b8'}/>
-        <KPICard icon="✅" label={`% Rendido ${ult?.periodo??'—'}`} value={ult?`${Number(ult.pct_rendido).toFixed(1)}%`:'—'} color="#10b981"/>
-        <KPICard icon="❌" label={`% No Rendido ${ult?.periodo??'—'}`} value={ult?`${Number(ult.pct_no_rendido).toFixed(1)}%`:'—'} color="#ef4444"/>
-        <KPICard icon="💸" label="Total No Rendido (histórico)" value={fmtMM(totalNR)} color={totalNR>0?'#ef4444':'#10b981'}/>
-      </div>
-      <div className="chart-card" style={{marginBottom:'1.25rem'}}>
-        <h3 className="chart-title">Acreditación de Saldos por Año (%)</h3>
-        <p style={{color:'#64748b',fontSize:'0.78rem',marginBottom:'0.5rem'}}>
-          <span style={{color:'#10b981'}}>■</span> Rendido &nbsp;<span style={{color:'#1e293b',border:'1px solid #334155',display:'inline-block',width:12,height:12}}></span> No rendido
-        </p>
-        <ReactECharts option={acredOption} style={{height:320}}/>
-      </div>
-      <div className="chart-card" style={{marginBottom:'1.25rem'}}>
-        <h3 className="chart-title">Monto No Rendido por Año (mM$)</h3>
-        <ReactECharts option={montoOption} style={{height:280}}/>
-      </div>
-      <div className="chart-card" style={{padding:0}}>
-        <div style={{padding:'1rem 1.25rem 0.75rem',borderBottom:'1px solid var(--line-subtle)'}}>
-          <h3 className="chart-title" style={{margin:0}}>Detalle por Año</h3>
-        </div>
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
-            <thead>
-              <tr style={{background:'#0f172a'}}>
-                {['Año','Nivel Riesgo','% Rendido','Monto Rendido','Monto No Rendido','Total','Docs'].map(h=>(
-                  <th key={h} style={{padding:'0.6rem 1rem',color:'#64748b',fontWeight:600,textAlign:'right',borderBottom:'1px solid #1e293b'}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...acreditacion_serie].reverse().map((r,i)=>(
-                <tr key={r.periodo} style={{borderBottom:'1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{r.periodo}</td>
-                  <td style={{padding:'0.5rem 1rem',textAlign:'right'}}>
-                    <span style={{fontSize:'0.72rem',fontWeight:600,color:RIESGO_COLORS[r.nivel_riesgo],background:`${RIESGO_COLORS[r.nivel_riesgo]}22`,border:`1px solid ${RIESGO_COLORS[r.nivel_riesgo]}`,borderRadius:999,padding:'0.15rem 0.5rem'}}>{r.nivel_riesgo}</span>
-                  </td>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{Number(r.pct_rendido).toFixed(1)}%</td>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{fmtMM(r.monto_rendido)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--danger)',textAlign:'right'}}>{fmtMM(r.monto_no_rendido)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--text-primary)',textAlign:'right'}}>{fmtMM(r.monto_total)}</td>
-                  <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{fmtN(r.total_docs)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </>
+    <div>
+      <BreadcrumbHeader mainLabel="Riesgo de Reintegro" mainIcon="📊" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      {subTab === 'acreditacion' && (
+        <WidgetWrapperEE widgetKey="ri_acreditacion">
+          <RiesgoChart detalleData={detalleData} />
+        </WidgetWrapperEE>
+      )}
+    </div>
   )
 }
 
-// ── Tab: Subvenciones ─────────────────────────────────────────────────────────
-function TabSubvencion({ data, periodo }) {
-  if (!data) return null
+function RiesgoChart({ detalleData }) {
   const C = useChartColors()
-  const pieOption = {
-    tooltip:{ trigger:'item', formatter:p=>`${p.name}<br/>${fmtMM(p.value)} (${p.percent}%)`, ...C.tooltip },
-    legend:{ orient:'vertical', right:10, top:'center', textStyle:{color:C.legend.color}, formatter:n=>n.length>22?n.slice(0,20)+'...':n },
-    series:[{ type:'pie', radius:['40%','70%'], center:['38%','50%'],
-      data:data.map((d,i)=>({ name:d.subvencion_alias||'Sin subvención', value:d.monto_total, itemStyle:{color:COLORS[i%COLORS.length]} })),
-      label:{show:false}, emphasis:{itemStyle:{shadowBlur:10,shadowOffsetX:0,shadowColor:'rgba(0,0,0,0.5)'}},
+  const serie = detalleData?.acreditacion_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos de acreditación.</div>
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      const rendido = params.find(p => p.seriesName === '% Rendido')
+      const noRendido = params.find(p => p.seriesName === '% No Rendido')
+      if (rendido) html += `${rendido.marker} ${rendido.seriesName}: <b>${rendido.value}%</b><br/>`
+      if (noRendido) html += `${noRendido.marker} ${noRendido.seriesName}: <b>${noRendido.value}%</b><br/>`
+      return html
+    }},
+    legend: { data: ['% Rendido', '% No Rendido'], textStyle: { color: C.axisLabel }, bottom: 0 },
+    color: ['#059669', '#dc2626'],
+    grid: { left: 40, right: 20, bottom: 60, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: '% Rendido', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_rendido)), barMaxWidth: 60 },
+      { name: '% No Rendido', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_no_rendido)), barMaxWidth: 60, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+    ],
+    backgroundColor: 'transparent',
+  }
+  return (
+    <div className="chart-card">
+      <h3 className="chart-title">Acreditación de Saldos (Serie Temporal)</h3>
+      <ReactECharts option={option} style={{ height: 400 }} />
+    </div>
+  )
+}
+
+// ── Tab: Subvencion (con sub-tabs) ─────────────────────────────────────────────
+function TabSubvencion({ data, periodo }) {
+  const C = useChartColors()
+  const { fmtAmt, unitLabel } = useContext(MoneyFmtCtx)
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-ee-subvencion') || 'composicion')
+  useEffect(() => { localStorage.setItem('pirgefse-ee-subvencion', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-ee-subvencion') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+  const SUB_TABS = [{ key: 'composicion', label: 'Composición', icon: '🥧' }]
+  const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
+
+  if (!data || data.length === 0) return (
+    <div>
+      <BreadcrumbHeader mainLabel="Subvenciones" mainIcon="🏷️" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      <div className="alert-info">No hay datos de subvenciones para {periodo || 'este período'}.</div>
+    </div>
+  )
+
+  const total = data.reduce((s, d) => s + Number(d.monto_total), 0)
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Monto: <b>${fmtAmt(p.value)}</b> (${p.percent}%)` },
+    legend: { orient: 'vertical', left: 'left', textStyle: { color: C.axisLabel } },
+    color: COLORS_CHART,
+    series: [{
+      name: 'Subvenciones', type: 'pie', radius: ['40%', '70%'], center: ['65%', '50%'],
+      itemStyle: { borderRadius: 10, borderColor: C.bg, borderWidth: 2 },
+      label: { show: false, position: 'center' },
+      emphasis: { label: { show: true, fontSize: '14', fontWeight: 'bold', color: C.axisLabel } },
+      labelLine: { show: false },
+      data: data.map(d => ({ value: Number(d.monto_total), name: d.subvencion_alias })),
     }],
-    backgroundColor:'transparent',
+    backgroundColor: 'transparent',
+  }
+  return (
+    <div>
+      <BreadcrumbHeader mainLabel="Subvenciones" mainIcon="🏷️" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      {subTab === 'composicion' && (
+        <WidgetWrapperEE widgetKey="sv_composicion">
+          <div>
+            <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+              <KPICard icon="💰" label="Monto Total" value={fmtAmt(total)} color="#8b5cf6" sub={`En ${periodo || 'total histórico'}`} />
+              <KPICard icon="📋" label="Líneas de Subvención" value={data.length} color="#ec4899" />
+            </div>
+            <div className="chart-card">
+              <h3 className="chart-title">Composición por Subvención ({unitLabel})</h3>
+              <ReactECharts option={option} style={{ height: 450 }} />
+            </div>
+          </div>
+        </WidgetWrapperEE>
+      )}
+    </div>
+  )
+}
+
+// ── Tab: Grupo SNED (con sub-tabs) ─────────────────────────────────────────────
+function TabGrupoSNED({ snedData, periodo }) {
+  const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-ee-sned') || 'kpis')
+  useEffect(() => { localStorage.setItem('pirgefse-ee-sned', subTab) }, [subTab])
+  useEffect(() => {
+    const handler = (e) => { if (e.detail.key === 'pirgefse-ee-sned') setSubTab(e.detail.val) }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [])
+  const SUB_TABS = [
+    { key: 'kpis', label: 'KPIs del Grupo', icon: '🏆' },
+    { key: 'tabla', label: 'Establecimientos del Grupo', icon: '📋' },
+  ]
+  const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
+
+  if (!snedData) return <div className="loading-area"><div className="spinner" /></div>
+  if (!snedData.grupo_homogeneo) return (
+    <div>
+      <BreadcrumbHeader mainLabel="SNED" mainIcon="🏆" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      <div className="chart-card">
+        <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          No se encontró grupo homogéneo SNED para este establecimiento en el año {snedData.agno_sned} (periodo {periodo}).
+        </p>
+      </div>
+    </div>
+  )
+
+  const { mi_establecimiento, establecimientos, grupo_homogeneo, agno_sned } = snedData
+  const todos = establecimientos || []
+
+  // Colores por estado SNED
+  const getEstadoColor = (sel) => {
+    const s = (sel || '').toLowerCase()
+    if (s.includes('100%')) return '#10b981'
+    if (s.includes('60%'))  return '#f59e0b'
+    if (s.includes('no premiado') || s === '') return '#94a3b8'
+    return '#6366f1'
   }
 
-  const barOption = {
-    tooltip:{ trigger:'axis', formatter:p=>`${p[0].name}<br/>${fmtMM(p[0].value)}`, ...C.tooltip },
-    grid:{ left:160, right:80, top:20, bottom:30 },
-    xAxis:{ type:'value', axisLabel:{color:C.axisLabel,formatter:v=>fmtMonedaCorto(v)}, splitLine:{lineStyle:{color:C.splitLine}} },
-    yAxis:{ type:'category', data:[...data].reverse().map(d=>d.subvencion_alias||'Sin subvención'), axisLabel:{color:C.axisLabel,width:150,overflow:'truncate'} },
-    series:[{ type:'bar', barMaxWidth:30,
-      data:[...data].reverse().map((d,i)=>({ value:d.monto_total, itemStyle:{color:COLORS[(data.length-1-i)%COLORS.length]} })),
-      label:{show:true, position:'right', color:C.axisLabel, formatter:p=>fmtMM(p.value)},
-    }],
-    backgroundColor:'transparent',
+  const getEstadoBadge = (sel, esMe) => {
+    const s = (sel || '').toLowerCase()
+    const color = getEstadoColor(sel)
+    const label = sel || 'No Premiado'
+    return (
+      <span style={{
+        padding: '0.2rem 0.6rem', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
+        background: `${color}18`, color, border: `1px solid ${color}44`,
+      }}>
+        {label}
+      </span>
+    )
   }
 
-  const total = data.reduce((s,d)=>s+Number(d.monto_total),0)
-  const totalDocs = data.reduce((s,d)=>s+Number(d.n_documentos),0)
+  // KPIs
+  const n_premiados = todos.filter(e => e.es_premiado).length
+  const n_no_premiados = todos.filter(e => !e.es_premiado).length
+  const sel_color = getEstadoColor(mi_establecimiento?.seleccionado_sned)
+
+  const kpisContent = (
+    <div>
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard icon="👥" label="Grupo Homogéneo" value={grupo_homogeneo.split('-').pop()?.trim() || 'Grupo'} color="#1e40af"
+          sub={grupo_homogeneo.length > 30 ? grupo_homogeneo.slice(0, 30) + '...' : ''} />
+        <KPICard icon="🏫" label="Total EE en el Grupo" value={mi_establecimiento?.n_establecimientos_gh ?? todos.length} color="#3b82f6" />
+        <KPICard icon="🏆" label="EE Premiados" value={n_premiados} color="#10b981" sub={`${n_no_premiados} No Premiados`} />
+        <KPICard icon="🥇" label="Mi Estado SNED" value={mi_establecimiento?.seleccionado_sned || 'No Premiado'}
+          color={sel_color} sub={`Posición ${mi_establecimiento?.posicion_gh ?? '—'}`} />
+      </div>
+    </div>
+  )
+
+  // Tabla completa con todos los EE del grupo
+  const tablaContent = (
+    <div className="chart-card">
+      <h3 className="chart-title">Todos los Establecimientos del Grupo Homogéneo — SNED {agno_sned}</h3>
+      <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--surface-overlay)' }}>
+              {['Pos.', 'RBD', 'Nombre Establecimiento', 'Estado SNED'].map(h => (
+                <th key={h} style={{ padding: '0.65rem 1rem', textAlign: h === 'Pos.' ? 'center' : 'left', borderBottom: '1px solid var(--line-subtle)', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.78rem' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {todos.length === 0 ? (
+              <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Sin datos para este grupo.</td></tr>
+            ) : todos.map((e, idx) => {
+              const isMe = e.es_mi_rbd
+              const isPremiado = e.es_premiado
+              // Separador antes del primer No Premiado
+              const prevPremiado = idx > 0 ? todos[idx - 1].es_premiado : true
+              const showSeparator = !isPremiado && prevPremiado && !isMe
+
+              const rowBg = isMe
+                ? 'rgba(99,102,241,0.08)'
+                : !isPremiado
+                  ? 'transparent'
+                  : (idx % 2 === 0 ? 'transparent' : 'var(--surface-overlay)')
+
+              return (
+                <>
+                  {showSeparator && (
+                    <tr key={`sep-${idx}`}>
+                      <td colSpan="4" style={{ padding: '0.4rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-overlay)', textTransform: 'uppercase', letterSpacing: '0.07em', borderTop: '2px solid var(--line-subtle)', borderBottom: '1px solid var(--line-subtle)' }}>
+                        No Premiados ({n_no_premiados})
+                      </td>
+                    </tr>
+                  )}
+                  <tr key={e.rbd} style={{ borderBottom: '1px solid var(--line-subtle)', background: rowBg, opacity: isPremiado || isMe ? 1 : 0.6 }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', fontWeight: isMe ? 700 : 500, color: isMe ? '#6366f1' : 'var(--text-secondary)' }}>{e.posicion_gh ?? '—'}</td>
+                    <td style={{ padding: '0.65rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: isMe ? '#6366f1' : 'var(--text-secondary)' }}>{e.rbd}</td>
+                    <td style={{ padding: '0.65rem 1rem', fontWeight: isMe ? 700 : 400, color: isMe ? '#6366f1' : 'var(--text-primary)' }}>
+                      {e.nom_rbd}
+                      {isMe && <span style={{ marginLeft: '0.5rem', background: '#6366f1', color: 'white', padding: '0.15rem 0.5rem', borderRadius: 999, fontSize: '0.68rem' }}>Mi Establecimiento</span>}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem' }}>{getEstadoBadge(e.seleccionado_sned, isMe)}</td>
+                  </tr>
+                </>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 
   return (
-    <>
-      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
-        <KPICard icon="💰" label={`Monto Total${periodo?' '+periodo:' (histórico)'}`} value={fmtMM(total)} color="#1e40af"/>
-        <KPICard icon="📄" label="Documentos" value={fmtN(totalDocs)} color="#3b82f6"/>
-        <KPICard icon="🏷️" label="Tipos de Subvención" value={fmtN(data.length)} color="#60a5fa"/>
-        <KPICard icon="🏆" label="Subvención Principal" value={data[0]?.subvencion_alias?.slice(0,20)??'—'} color="#2563eb" sub={data[0]?fmtMM(data[0].monto_total):''}/>
+    <div>
+      <BreadcrumbHeader mainLabel="SNED" mainIcon="🏆" subLabel={currentTab.label} subIcon={currentTab.icon} />
+      <div className="alert-info" style={{ marginBottom: '1.5rem', borderRadius: '8px' }}>
+        ℹ️ Resultados SNED año <strong>{agno_sned}</strong>. Se muestran <strong>todos los establecimientos</strong> del grupo homogéneo.
+        Se destacan primero tu establecimiento, luego los <strong>premiados</strong> y finalmente los <strong>no premiados</strong>.
       </div>
-      <div className="charts-grid-2">
-        <div className="chart-card">
-          <h3 className="chart-title">Distribución Porcentual</h3>
-          <ReactECharts option={pieOption} style={{height:380}}/>
-        </div>
-        <div className="chart-card">
-          <h3 className="chart-title">Monto por Subvención (mM$)</h3>
-          <ReactECharts option={barOption} style={{height:380}}/>
-        </div>
-      </div>
-    </>
+      {subTab === 'kpis'  && <WidgetWrapperEE widgetKey="sned_kpis">{kpisContent}</WidgetWrapperEE>}
+      {subTab === 'tabla' && <WidgetWrapperEE widgetKey="sned_tabla">{tablaContent}</WidgetWrapperEE>}
+    </div>
   )
+}
+
+
+// ── Tab: Resumen Personalizado ─────────────────────────────────────────────────
+function TabResumenEstablecimiento({ detalleData, periodo }) {
+  const { pins, togglePin } = usePinsEE()
+  const grupos = [...new Set(ESTABLECIMIENTO_WIDGETS.map(w => w.grupo))]
+
+  if (pins.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 420, gap: '1.5rem', padding: '3rem' }}>
+        <div style={{ fontSize: '4rem' }}>📌</div>
+        <h3 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>Tu Resumen está vacío</h3>
+        <p style={{ color: 'var(--text-muted)', textAlign: 'center', maxWidth: 480, margin: 0, lineHeight: 1.6 }}>
+          Navega a cualquier sección (Financiero, Eficiencia, Riesgo, etc.) y presiona el botón{' '}
+          <strong style={{ color: '#6366f1' }}>📌 Agregar al Resumen</strong>{' '}en los gráficos que quieras ver aquí.
+        </p>
+        <div style={{ width: '100%', maxWidth: 720, marginTop: '1rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.75rem', textAlign: 'center' }}>
+            O agrega indicadores directamente desde aquí:
+          </p>
+          {grupos.map(grupo => (
+            <div key={grupo} style={{ marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>{grupo}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {ESTABLECIMIENTO_WIDGETS.filter(w => w.grupo === grupo).map(w => (
+                  <button key={w.key} onClick={() => togglePin(w.key)}
+                    style={{ padding: '0.3rem 0.75rem', borderRadius: '999px', border: `1.5px solid ${w.color}44`, background: `${w.color}10`, color: w.color, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'all 0.15s' }}>
+                    <span>{w.icon}</span> {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ fontSize: '1.1rem' }}>📌</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.9rem' }}>
+            {pins.length} indicador{pins.length !== 1 ? 'es' : ''} en tu Resumen
+          </span>
+        </div>
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· Año seleccionado: <strong>{periodo}</strong></span>
+      </div>
+      <details style={{ marginBottom: '1.5rem' }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 600, padding: '0.5rem 0', userSelect: 'none' }}>
+          ➕ Agregar / quitar indicadores
+        </summary>
+        <div style={{ marginTop: '0.75rem', padding: '1rem', background: 'var(--surface-overlay)', borderRadius: '0.5rem', border: '1px solid var(--line-subtle)' }}>
+          {grupos.map(grupo => (
+            <div key={grupo} style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>{grupo}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {ESTABLECIMIENTO_WIDGETS.filter(w => w.grupo === grupo).map(w => {
+                  const pinned = pins.includes(w.key)
+                  return (
+                    <button key={w.key} onClick={() => togglePin(w.key)}
+                      style={{ padding: '0.25rem 0.65rem', borderRadius: '999px', border: pinned ? `1.5px solid ${w.color}` : `1.5px solid ${w.color}44`, background: pinned ? `${w.color}22` : `${w.color}08`, color: pinned ? w.color : `${w.color}99`, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'all 0.15s' }}>
+                      {pinned ? '📌' : '○'} {w.icon} {w.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+      {pins.map(key => {
+        const widget = EE_WIDGET_MAP[key]
+        if (!widget) return null
+        const content = renderEEWidgetContent(key, { detalleData, periodo })
+        if (!content) return null
+        return (
+          <div key={key} style={{ marginBottom: '1.5rem', border: `1px solid ${widget.color}44`, borderRadius: '0.75rem', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.25rem', background: `${widget.color}10`, borderBottom: `1px solid ${widget.color}30` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.1rem' }}>{widget.icon}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.92rem' }}>{widget.label}</span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: widget.color, background: `${widget.color}18`, border: `1px solid ${widget.color}44`, borderRadius: '999px', padding: '0.1rem 0.5rem' }}>{widget.grupo}</span>
+              </div>
+              <button
+                onClick={() => { if (window.confirm(`¿Quitar "${widget.label}" del resumen?`)) togglePin(key) }}
+                title="Quitar del Resumen"
+                style={{ padding: '0.25rem 0.6rem', borderRadius: '999px', border: '1px solid var(--line-subtle)', background: 'var(--surface-overlay)', color: 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', transition: 'all 0.15s' }}>
+                🗑️ Quitar
+              </button>
+            </div>
+            <div style={{ padding: '1.25rem' }}>{content}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Render de widgets en el Resumen ───────────────────────────────────────────
+function renderEEWidgetContent(key, { detalleData, periodo }) {
+  switch (key) {
+    case 'fin_ingreso_gasto':   return <FinancieroChart detalleData={detalleData} />
+    case 'ef_distribucion_gasto': return <EficienciaChart detalleData={detalleData} />
+    case 'ri_acreditacion':     return <RiesgoChart detalleData={detalleData} />
+    case 'sv_composicion':      return <div className="alert-info">Selecciona la sección Subvenciones para ver este indicador.</div>
+    case 'sned_kpis':           return <div className="alert-info">Selecciona la sección SNED para ver los KPIs.</div>
+    case 'sned_tabla':          return <div className="alert-info">Selecciona la sección SNED para ver la tabla del grupo.</div>
+    default:                    return null
+  }
 }

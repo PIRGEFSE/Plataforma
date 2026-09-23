@@ -7,6 +7,7 @@ from config import settings
 from database import engine
 from routes.auth_routes import router as auth_router
 from routes.dashboard import router as dashboard_router
+from routes.sostenibilidad_routes import router as sostenibilidad_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ app.add_middleware(
 # Routers
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(sostenibilidad_router)
 
 @app.get("/health")
 async def health():

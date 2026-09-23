@@ -35,92 +35,221 @@ const NAV_ITEMS = [
   { path: '/mi-ficha/sostenibilidad-riesgo', label: 'Sostenibilidad y Riesgo', icon: '🛡️', roles: ['sostenedor'] },
   { path: '/mi-ficha/comportamiento-financiero', label: 'Comportamiento Financiero', icon: '📈', roles: ['sostenedor'] },
   { path: '/mi-ficha/territorio', label: 'Territorio', icon: '🗺️', roles: ['sostenedor'] },
+  { path: '/mi-ficha/convivencia', label: 'Convivencia Escolar', icon: '🤝', roles: ['sostenedor'] },
   { path: '/mi-subvencion', label: 'Subvenciones', icon: '🏫', roles: ['sostenedor'], hiddenForUsers: ['sostenedor'] },
   { path: '/mi-establecimiento', label: 'Mi Establecimiento', icon: '🏫', roles: ['establecimiento'] },
   { path: '/mi-establecimiento/financiero', label: 'Financiero', icon: '💵', roles: ['establecimiento'] },
   { path: '/mi-establecimiento/eficiencia', label: 'Eficiencia del Gasto', icon: '⚙️', roles: ['establecimiento'] },
   { path: '/mi-establecimiento/riesgo', label: 'Riesgo', icon: '📊', roles: ['establecimiento'] },
   { path: '/mi-establecimiento/subvencion', label: 'Subvenciones', icon: '🏷️', roles: ['establecimiento'] },
+  { path: '/mi-establecimiento/sned-grupo', label: 'Grupo Homogéneo SNED', icon: '🏆', roles: ['establecimiento'] },
 ]
 
-// Estructura jerárquica de navegación para el rol sostenedor
 const SOSTENEDOR_NAV_GROUPS = [
   {
     path: '/mi-ficha/geo-establecimiento',
     label: 'Visión Global',
     icon: '🌍',
     exact: true,
-    children: [],
   },
   {
     path: '/mi-ficha/resumen',
     label: 'Resumen',
     icon: '🗂️',
     exact: true,
-    children: [],
   },
   {
     path: '/mi-ficha',
     label: 'Mis Establecimientos',
     icon: '🏛️',
     exact: true,
-    children: [],
-  },
-  {
-    path: '/mi-ficha/educativo-financiero',
-    label: 'Educativo - Financiero',
-    icon: '📊',
-    children: [
-      { label: 'Ingreso - Gasto', icon: '💵', lsKey: 'pirgefse-fichasost-educativo-financiero', lsVal: 'ingreso_gasto' },
-      { label: 'SNED',            icon: '🏆', lsKey: 'pirgefse-fichasost-educativo-financiero', lsVal: 'sned' },
-    ],
-  },
-  {
-    path: '/mi-ficha/eficiencia',
-    label: 'Eficiencia del Gasto',
-    icon: '⚙️',
-    children: [
-      { label: 'Innovación Pedagógica',      icon: '💡', lsKey: 'pirgefse-fichasost-eficiencia', lsVal: 'innovacion' },
-      { label: 'Costo por Alumno Educativo', icon: '🎓', lsKey: 'pirgefse-fichasost-eficiencia', lsVal: 'costo' },
-      { label: 'Gasto Administrativo',       icon: '💼', lsKey: 'pirgefse-fichasost-eficiencia', lsVal: 'administrativo' },
-    ],
-  },
-  {
-    path: '/mi-ficha/sostenibilidad-riesgo',
-    label: 'Sostenibilidad y Riesgo',
-    icon: '🛡️',
-    children: [
-      { label: 'Acreditación de Saldos',       icon: '📊', lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo', lsVal: 'acreditacion' },
-      { label: 'Sostenibilidad Rem./Ingreso',   icon: '🛡️', lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo', lsVal: 'sostenibilidad' },
-      { label: 'HHI Fuentes de Ingreso',        icon: '💰', lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo', lsVal: 'hhi' },
-    ],
-  },
-  {
-    path: '/mi-ficha/comportamiento-financiero',
-    label: 'Comportamiento Financiero',
-    icon: '📈',
-    children: [
-      { label: 'Gastos Rem. sobre Ingreso Dep.', icon: '📉', lsKey: 'pirgefse-fichasost-comportamiento', lsVal: 'gasto_rem' },
-      { label: 'Análisis Rendición',             icon: '📋', lsKey: 'pirgefse-fichasost-comportamiento', lsVal: 'analisis_rendicion' },
-    ],
   },
   {
     path: '/mi-ficha/territorio',
-    label: 'Territorio',
-    icon: '🗺️',
-    children: [
-      { label: 'Complejidad Educativa', icon: '🧩', lsKey: 'pirgefse-fichasost-territorio', lsVal: 'complejidad' },
-      { label: 'Gasto Educativo',       icon: '💰', lsKey: 'pirgefse-fichasost-territorio', lsVal: 'gasto' },
-    ],
+    label: '1. Complejidad Educativa',
+    icon: '🧩',
+    lsKey: 'pirgefse-fichasost-territorio',
+    lsVal: 'complejidad',
+    isDefault: true
   },
-
-
+  {
+    path: '/mi-ficha/eficiencia',
+    label: '2. Costo por Alumno Educativo',
+    icon: '🎓',
+    lsKey: 'pirgefse-fichasost-eficiencia',
+    lsVal: 'costo'
+  },
+  {
+    path: '/mi-ficha/territorio',
+    label: '3. Gasto Educativo',
+    icon: '💰',
+    lsKey: 'pirgefse-fichasost-territorio',
+    lsVal: 'gasto'
+  },
+  {
+    path: '/mi-ficha/eficiencia',
+    label: '4. Gasto Administrativo',
+    icon: '💼',
+    lsKey: 'pirgefse-fichasost-eficiencia',
+    lsVal: 'administrativo'
+  },
+  {
+    path: '/mi-ficha/sostenibilidad-riesgo',
+    label: '5. Variación interanual de ingresos',
+    icon: '🛡️',
+    lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo',
+    lsVal: 'sostenibilidad'
+  },
+  {
+    path: '/mi-ficha/sostenibilidad-riesgo',
+    label: '6. Acreditación de Saldos',
+    icon: '📊',
+    lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo',
+    lsVal: 'acreditacion',
+    isDefault: true
+  },
+  {
+    path: '/mi-ficha/comportamiento-financiero',
+    label: '7. Análisis Rendición',
+    icon: '📋',
+    lsKey: 'pirgefse-fichasost-comportamiento',
+    lsVal: 'analisis_rendicion'
+  },
+  {
+    path: '/mi-ficha/comportamiento-financiero',
+    label: '8. Proyección Saldos Iniciales',
+    icon: '🔮',
+    lsKey: 'pirgefse-fichasost-comportamiento',
+    lsVal: 'proyeccion_saldos'
+  },
+  {
+    path: '/mi-ficha/comportamiento-financiero',
+    label: '9. Gastos Rem. sobre Ingreso Dep.',
+    icon: '📉',
+    lsKey: 'pirgefse-fichasost-comportamiento',
+    lsVal: 'gasto_rem',
+    isDefault: true
+  },
+  {
+    path: '/mi-ficha/eficiencia',
+    label: '10. Innovación Pedagógica',
+    icon: '💡',
+    lsKey: 'pirgefse-fichasost-eficiencia',
+    lsVal: 'innovacion',
+    isDefault: true
+  },
+  {
+    path: '/mi-ficha/sostenibilidad-riesgo',
+    label: '11. HHI Fuentes de Ingreso',
+    icon: '💰',
+    lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo',
+    lsVal: 'hhi'
+  },
+  {
+    path: '/mi-ficha/educativo-financiero',
+    label: '12. SNED',
+    icon: '🏆',
+    lsKey: 'pirgefse-fichasost-educativo-financiero',
+    lsVal: 'sned'
+  },
+  {
+    path: '/mi-ficha/eficiencia',
+    label: '13. Dotación Docente',
+    icon: '🧑‍🏫',
+    lsKey: 'pirgefse-fichasost-eficiencia',
+    lsVal: 'dotacion'
+  },
+  {
+    path: '/mi-ficha/sostenibilidad-riesgo',
+    label: 'HHI Proveedores',
+    icon: '🏪',
+    lsKey: 'pirgefse-fichasost-sostenibilidad-riesgo',
+    lsVal: 'hhi_proveedores'
+  },
+  {
+    path: '/mi-ficha/educativo-financiero',
+    label: 'Ingreso - Gasto',
+    icon: '💵',
+    lsKey: 'pirgefse-fichasost-educativo-financiero',
+    lsVal: 'ingreso_gasto',
+    isDefault: true
+  },
+  {
+    path: '/mi-ficha/convivencia',
+    label: 'Convivencia Escolar',
+    icon: '🤝',
+    exact: true,
+  },
   {
     path: '/mi-ficha/simce',
     label: 'SIMCE',
-    icon: '📈',
+    icon: '📝',
+    exact: true,
+  },
+]
+
+// Estructura jerárquica de navegación para el rol establecimiento
+const ESTABLECIMIENTO_NAV_GROUPS = [
+  {
+    path: '/mi-establecimiento/resumen',
+    label: 'Resumen',
+    icon: '🗂️',
     exact: true,
     children: [],
+  },
+  {
+    path: '/mi-establecimiento',
+    label: 'Mi Establecimiento',
+    icon: '🏫',
+    exact: true,
+    children: [],
+  },
+  {
+    path: '/mi-establecimiento/financiero',
+    label: 'Educativo - Financiero',
+    icon: '📊',
+    exact: true,
+    children: [
+      { label: 'Ingreso vs Gasto', icon: '💵', lsKey: 'pirgefse-ee-financiero', lsVal: 'ingreso_gasto' },
+      { label: '12. SNED',             icon: '🏆', lsKey: 'pirgefse-ee-financiero', lsVal: 'sned' },
+    ],
+  },
+  {
+    path: '/mi-establecimiento/eficiencia',
+    label: 'Eficiencia del Gasto',
+    icon: '⚙️',
+    exact: true,
+    children: [
+      { label: 'Distribución del Gasto', icon: '📊', lsKey: 'pirgefse-ee-eficiencia', lsVal: 'distribucion' },
+    ],
+  },
+  {
+    path: '/mi-establecimiento/riesgo',
+    label: 'Riesgo',
+    icon: '📊',
+    exact: true,
+    children: [
+      { label: '6. Acreditación de Saldos', icon: '🛡️', lsKey: 'pirgefse-ee-riesgo', lsVal: 'acreditacion' },
+    ],
+  },
+  {
+    path: '/mi-establecimiento/subvencion',
+    label: 'Subvenciones',
+    icon: '🏷️',
+    exact: true,
+    children: [
+      { label: 'Composición', icon: '🥧', lsKey: 'pirgefse-ee-subvencion', lsVal: 'composicion' },
+    ],
+  },
+  {
+    path: '/mi-establecimiento/sned-grupo',
+    label: 'Grupo Homogéneo SNED',
+    icon: '🏆',
+    exact: true,
+    children: [
+      { label: 'KPIs del Grupo',               icon: '🏆', lsKey: 'pirgefse-ee-sned', lsVal: 'kpis' },
+      { label: 'Establecimientos del Grupo',   icon: '📋', lsKey: 'pirgefse-ee-sned', lsVal: 'tabla' },
+    ],
   },
 ]
 
@@ -134,16 +263,38 @@ function NavGroup({ group, sidebarOpen, navigate, isActive, currentPath }) {
     return saved !== null ? saved === 'true' : (hasChildren && currentPath.startsWith(group.path))
   })
 
+  const [localVal, setLocalVal] = useState(() => {
+    try { return group.lsKey ? localStorage.getItem(group.lsKey) : null } catch { return null }
+  })
+
   // Auto-expandir al navegar hacia este grupo
   useEffect(() => {
     if (isActive && hasChildren) setExpanded(true)
-  }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isActive, hasChildren])
 
   useEffect(() => {
     localStorage.setItem(storageKey, String(expanded))
   }, [expanded, storageKey])
 
+  useEffect(() => {
+    if (!group.lsKey) return
+    const handler = (e) => {
+      if (e.detail.key === group.lsKey) {
+        setLocalVal(e.detail.val)
+      }
+    }
+    window.addEventListener('pirgefse-subtab', handler)
+    return () => window.removeEventListener('pirgefse-subtab', handler)
+  }, [group.lsKey])
+
   const handleGroupClick = () => {
+    if (group.lsKey) {
+      localStorage.setItem(group.lsKey, group.lsVal)
+      window.dispatchEvent(new CustomEvent('pirgefse-subtab', {
+        detail: { key: group.lsKey, val: group.lsVal }
+      }))
+    }
+
     if (isActive) {
       if (hasChildren && sidebarOpen) setExpanded(e => !e)
     } else {
@@ -155,7 +306,6 @@ function NavGroup({ group, sidebarOpen, navigate, isActive, currentPath }) {
   const handleChildClick = (child) => {
     if (child.lsKey) {
       localStorage.setItem(child.lsKey, child.lsVal)
-      // Notificar al componente montado para que cambie su sub-tab sin re-montar
       window.dispatchEvent(new CustomEvent('pirgefse-subtab', {
         detail: { key: child.lsKey, val: child.lsVal }
       }))
@@ -167,10 +317,13 @@ function NavGroup({ group, sidebarOpen, navigate, isActive, currentPath }) {
     try { return localStorage.getItem(lsKey) } catch { return null }
   }
 
+  const isActiveMatch = !group.lsKey || localVal === group.lsVal || (localVal === null && group.isDefault)
+  const isGroupActive = isActive && isActiveMatch
+
   return (
-    <div className="nav-group">
+    <div className={hasChildren ? "nav-group" : ""}>
       <button
-        className={`nav-group-header${(!hasChildren && isActive) ? ' active' : ''}`}
+        className={`nav-group-header${(!hasChildren && isGroupActive) ? ' active' : ''}`}
         onClick={handleGroupClick}
         title={group.label}
       >
@@ -254,7 +407,24 @@ export default function Dashboard() {
         <nav className="sidebar-nav">
           {user?.role === 'sostenedor' ? (
             SOSTENEDOR_NAV_GROUPS.map(group => {
-              // Calcular isActive en el padre donde location siempre es reactivo
+              const isActive = group.exact
+                ? location.pathname === group.path
+                : location.pathname === group.path || location.pathname.startsWith(group.path + '/')
+              
+              const uniqueKey = group.lsVal ? `${group.path}-${group.lsVal}` : group.path;
+              return (
+                <NavGroup
+                  key={uniqueKey}
+                  group={group}
+                  sidebarOpen={sidebarOpen}
+                  navigate={navigate}
+                  isActive={isActive}
+                  currentPath={location.pathname}
+                />
+              )
+            })
+          ) : user?.role === 'establecimiento' ? (
+            ESTABLECIMIENTO_NAV_GROUPS.map(group => {
               const isActive = group.exact
                 ? location.pathname === group.path
                 : location.pathname === group.path || location.pathname.startsWith(group.path + '/')
@@ -334,6 +504,7 @@ export default function Dashboard() {
                 <Route path="/mi-ficha/territorio" element={<FichaSostenedor section="territorio" />} />
                 <Route path="/mi-ficha/presupuesto" element={<FichaSostenedor section="presupuesto" />} />
                 <Route path="/mi-ficha/geo-establecimiento" element={<FichaSostenedor section="geo_establecimiento" />} />
+                <Route path="/mi-ficha/convivencia" element={<FichaSostenedor section="convivencia" />} />
 
                 <Route path="/mi-ficha/simce" element={<FichaSostenedor section="simce" />} />
                 <Route path="/mi-subvencion" element={<SubvencionSostenedor />} />
@@ -342,10 +513,12 @@ export default function Dashboard() {
             {user?.role === 'establecimiento' && (
               <>
                 <Route path="/mi-establecimiento" element={<FichaEstablecimiento section="perfil" />} />
+                <Route path="/mi-establecimiento/resumen" element={<FichaEstablecimiento section="resumen" />} />
                 <Route path="/mi-establecimiento/financiero" element={<FichaEstablecimiento section="financiero" />} />
                 <Route path="/mi-establecimiento/eficiencia" element={<FichaEstablecimiento section="eficiencia" />} />
                 <Route path="/mi-establecimiento/riesgo" element={<FichaEstablecimiento section="riesgo" />} />
                 <Route path="/mi-establecimiento/subvencion" element={<FichaEstablecimiento section="subvencion" />} />
+                <Route path="/mi-establecimiento/sned-grupo" element={<FichaEstablecimiento section="sned_grupo" />} />
               </>
             )}
           </Routes>

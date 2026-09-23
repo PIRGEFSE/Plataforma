@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { useChartColors } from '../../hooks/useChartColors'
-import { useMoneyFmt } from './FichaSostenedor'
+import { useMoneyFmt } from '../../components/DashboardWidgets'
 import { fmtN } from '../../lib/format'
 
 const SUB_TABS = [
@@ -33,6 +33,7 @@ function KPI({ icon, label, value, color = '#6366f1', sub }) {
 // ── Sub-tab Resumen ──────────────────────────────────────────────────────────
 function TabResumen({ data }) {
   const C = useChartColors()
+  const { fmtAmt } = useMoneyFmt()
   if (!data) return null
   const { kpis, serie_anual = [], por_mecanismo = [], por_tema = [] } = data
 
@@ -72,6 +73,21 @@ function TabResumen({ data }) {
     backgroundColor: 'transparent',
   }
 
+  const hasIDPS = kpis.prom_ar != null || kpis.prom_ao != null || kpis.prom_as != null;
+  const idpsOpt = hasIDPS ? {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip },
+    legend: { data: ['Puntaje Promedio', 'Brecha Crítica (100 - Prom)'], textStyle: { color: C.axisLabel }, bottom: 0 },
+    color: ['#10b981', '#ef4444'],
+    grid: { left: 140, right: 30, top: 20, bottom: 40 },
+    xAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel }, splitLine: { lineStyle: { color: C.splitLine } } },
+    yAxis: { type: 'category', data: ['Ambiente Seguro', 'Ambiente Organizado', 'Ambiente de Respeto'], axisLabel: { color: C.axisLabel, fontSize: 11, width: 130, overflow: 'truncate' } },
+    series: [
+      { name: 'Puntaje Promedio', type: 'bar', stack: 'total', data: [kpis.prom_as || 0, kpis.prom_ao || 0, kpis.prom_ar || 0], barMaxWidth: 24, itemStyle: { color: '#10b981' } },
+      { name: 'Brecha Crítica (100 - Prom)', type: 'bar', stack: 'total', data: [100 - (kpis.prom_as || 100), 100 - (kpis.prom_ao || 100), 100 - (kpis.prom_ar || 100)], barMaxWidth: 24, itemStyle: { color: '#ef444420', borderColor: '#ef4444', borderWidth: 1, borderRadius: [0,4,4,0] } }
+    ],
+    backgroundColor: 'transparent',
+  } : null;
+
   return (
     <>
       <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
@@ -80,6 +96,8 @@ function TabResumen({ data }) {
         <KPI icon="🤝" label="% Mediados" value={`${kpis.pct_mediados}%`} color="#3b82f6" />
         <KPI icon="🏫" label="Establec. con Casos" value={fmtN(kpis.n_establecimientos)} color="#f59e0b" />
         <KPI icon="🧩" label="IVE Promedio" value={kpis.ive_promedio != null ? kpis.ive_promedio.toFixed(2) : '—'} color="#8b5cf6" />
+        <KPI icon="🚨" label="Tasa Denuncias" value={kpis.tasa_denuncias_100 != null ? `${kpis.tasa_denuncias_100}` : '—'} sub="cada 100 alum." color="#ef4444" />
+        <KPI icon="💰" label="Gasto Convivencia" value={kpis.gasto_convivencia ? fmtAmt(kpis.gasto_convivencia) : '—'} sub="rendido efectivo" color="#06b6d4" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -94,9 +112,16 @@ function TabResumen({ data }) {
       </div>
 
       {por_tema.length > 0 && (
-        <div className="chart-card">
+        <div className="chart-card" style={{ marginBottom: '1rem' }}>
           <h3 className="chart-title">Top Temas de Ingreso ({data.periodo_usado})</h3>
           <ReactECharts option={temaOpt} style={{ height: Math.max(200, por_tema.length * 30 + 20) }} />
+        </div>
+      )}
+
+      {hasIDPS && (
+        <div className="chart-card">
+          <h3 className="chart-title">Brecha Crítica de Clima de Convivencia IDPS ({data.periodo_usado})</h3>
+          <ReactECharts option={idpsOpt} style={{ height: 220 }} />
         </div>
       )}
     </>

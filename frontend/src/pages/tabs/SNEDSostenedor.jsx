@@ -3,7 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
-import { useMoneyFmt } from './FichaSostenedor'
+import { useMoneyFmt } from '../../components/DashboardWidgets'
 import SqlViewer from '../../components/SqlViewer'
 import { WidgetWrapper } from './FichaSostenedor'
 
@@ -100,7 +100,13 @@ export default function SNEDSostenedor({ sostId, periodo, widgetFilter }) {
 
   // ── Filtrado y paginación ─────────────────────────────────────────────────
   const ft = search.toLowerCase().trim()
-  const filtered = ees.filter(d =>
+  const validEes = ees.filter(d => 
+    d.ind_sned != null || 
+    (d.ingreso != null && d.ingreso !== 0) || 
+    (d.gasto != null && d.gasto !== 0) || 
+    (d.saldo_inicial != null && d.saldo_inicial !== 0)
+  )
+  const filtered = validEes.filter(d =>
     (d.nom_rbd || '').toLowerCase().includes(ft) ||
     String(d.rbd || '').includes(ft)
   )
@@ -116,18 +122,30 @@ export default function SNEDSostenedor({ sostId, periodo, widgetFilter }) {
     return 1;
   };
 
-  // ── Scatter: Puntaje SNED vs Ingreso ─────────────────────────────────────
+  // ── Scatter: Puntaje SNED vs Riesgo Financiero ─────────────────────────────────────
+  const getRiskColor = (riesgo) => {
+    switch (riesgo) {
+      case 'Riesgo Bajo': return '#10b981'
+      case 'Riesgo Medio': return '#f59e0b'
+      case 'Riesgo Alto': return '#f97316'
+      case 'Riesgo Crítico': return '#ef4444'
+      default: return '#64748b'
+    }
+  }
+
   const scatterData = paginated
-    .filter(d => d.ind_sned != null && d.ingreso != null)
+    .filter(d => d.ind_sned != null && d.superavit_depurado != null)
     .map(d => ({
-      value: [d.ind_sned, d.ingreso / 1e6, d.gasto ?? 0],
+      value: [d.ind_sned, d.superavit_depurado / 1e6, d.ingreso_depurado ?? 0, d.nivel_riesgo],
       name: d.nom_rbd,
       rbd: d.rbd,
-      color: snedColor(d),
       snedScore: getSnedScore(d.seleccionado_sned),
+      nivelRiesgo: d.nivel_riesgo,
+      itemStyle: { color: getRiskColor(d.nivel_riesgo) }
     }))
 
-  const maxGasto = Math.max(...paginated.map(d => d.gasto || 0), 1)
+  const maxIngreso = Math.max(...paginated.map(d => d.ingreso_depurado || 0), 1)
+  
   const scatterOpt = {
     aria: { decal: { show: true } },
     tooltip: {
@@ -136,8 +154,9 @@ export default function SNEDSostenedor({ sostId, periodo, widgetFilter }) {
         const d = p.data
         return `<b>${d.name}</b> (${d.rbd})<br/>
           🏆 SNED: <b>${Number(d.value[0]).toFixed(1)}</b><br/>
-          💰 Ingreso: <b>${fmtAmt(d.value[1] * 1e6)}</b><br/>
-          📉 Gasto: <b>${fmtAmt(d.value[2])}</b><br/>
+          💰 Ingreso Depurado: <b>${fmtAmt(d.value[2])}</b><br/>
+          ⚖️ Superávit/Déficit: <b>${fmtAmt(d.value[1] * 1e6)}</b><br/>
+          🚨 Riesgo Financiero: <b>${d.nivelRiesgo || 'N/A'}</b><br/>
           ${d.snedScore === 3 ? '✅ 100% Premiado' : d.snedScore === 2 ? '✅ 60% Premiado' : '❌ No Premiado'}`
       }
     },
@@ -150,27 +169,27 @@ export default function SNEDSostenedor({ sostId, periodo, widgetFilter }) {
       axisLabel: { color: C.axisLabel }, splitLine: { lineStyle: { color: C.splitLine } },
     },
     yAxis: {
-      type: 'value', name: `Ingreso (M$)`, nameLocation: 'middle', nameGap: 55, scale: true,
+      type: 'value', name: `Superávit (M$)`, nameLocation: 'middle', nameGap: 55, scale: true,
       axisLabel: { color: C.axisLabel, formatter: v => `${(v / 1000).toFixed(0)} mM$` },
       splitLine: { lineStyle: { color: C.splitLine } },
     },
     series: [
       {
         name: '100% Premiado', type: 'scatter', symbol: 'circle',
-        itemStyle: { color: '#1e40af', borderColor: '#fff', borderWidth: 1.5 },
-        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxGasto)) * 35),
+        itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
+        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxIngreso)) * 35),
         data: scatterData.filter(d => d.snedScore === 3),
       },
       {
         name: '60% Premiado', type: 'scatter', symbol: 'rect',
-        itemStyle: { color: '#3b82f6', borderColor: '#fff', borderWidth: 1.5 },
-        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxGasto)) * 35),
+        itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
+        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxIngreso)) * 35),
         data: scatterData.filter(d => d.snedScore === 2),
       },
       {
         name: 'No Premiado', type: 'scatter', symbol: 'triangle',
-        itemStyle: { color: '#94a3b8', opacity: 0.5, borderColor: '#64748b', borderWidth: 1 },
-        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxGasto)) * 35),
+        itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
+        symbolSize: val => Math.max(8, (Math.sqrt(val[2] || 0) / Math.sqrt(maxIngreso)) * 35),
         data: scatterData.filter(d => d.snedScore <= 1),
       },
     ],
@@ -253,7 +272,7 @@ export default function SNEDSostenedor({ sostId, periodo, widgetFilter }) {
       bottom: 0,
     },
     radar: {
-      indicator: SNED_INDICADORES.map(ind => ({ name: ind.label, max: maxVal })),
+      indicator: SNED_INDICADORES.map(ind => ({ name: ind.nombre, max: maxVal })),
       center: ['50%', '46%'],
       radius: '58%',
       splitArea: { areaStyle: { color: ['#0f172a10', '#1e293b10'] } },
@@ -397,6 +416,8 @@ GROUP BY rbd;`
                       { h: `Ingreso (${unitLabel})`, a: 'right' },
                       { h: `Gasto (${unitLabel})`, a: 'right' },
                       { h: `Superávit (${unitLabel})`, a: 'right' },
+                      { h: `Saldo Inicial (${unitLabel})`, a: 'right' },
+                      { h: `Saldo Final (${unitLabel})`, a: 'right' },
                     ].map(({ h, a }) => (
                       <th key={h} style={{ padding: '0.6rem 0.8rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: a, borderBottom: '1px solid var(--line-subtle)', whiteSpace: 'nowrap' }}>
                         {h}
@@ -437,6 +458,12 @@ GROUP BY rbd;`
                           {d.superavit != null
                             ? <strong style={{ color: supColor }}>{fmtAmt(d.superavit)}</strong>
                             : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.8rem', textAlign: 'right', color: C.axisLabel, fontVariantNumeric: 'tabular-nums' }}>
+                          {d.saldo_inicial != null ? fmtAmt(d.saldo_inicial) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.8rem', textAlign: 'right', fontWeight: 700, color: ((d.superavit || 0) + (d.saldo_inicial || 0)) >= 0 ? '#10b981' : '#ef4444', fontVariantNumeric: 'tabular-nums' }}>
+                          {(d.superavit != null || d.saldo_inicial != null) ? fmtAmt((d.superavit || 0) + (d.saldo_inicial || 0)) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                         </td>
                       </tr>
                     )
