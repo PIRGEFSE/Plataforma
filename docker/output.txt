@@ -1,0 +1,15 @@
+ dependencia_funcion | abrev  |            descripcion            
+---------------------+--------+-----------------------------------
+ RBD                 | DOCDIR | Docente Directivo
+ RBD                 | DOCAUL | Docente Aula
+ RBD                 | DOCTEP | Docente Técnico Pedagógico
+ RBD                 | ASIPRO | Asistente Profesional
+ RBD                 | ASIPAR | Asistente Paradocente
+ RBD                 | ASIAUX | Asistente Servicio Auxiliar
+ AC                  | RL     | Representante Legal
+ AC                  | ADMIN  | Administrador
+ AC                  | DIR    | Directivo
+ AC                  | PRO    | Profesional
+ AC                  | ASIAS  | Asistente Administración Superior
+(11 rows)
+

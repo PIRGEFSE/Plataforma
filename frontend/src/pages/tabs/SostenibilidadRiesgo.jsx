@@ -4,11 +4,13 @@ import api from '../../lib/api'
 import { fmtMoneda, fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
 import HHIFuentes from './HHIFuentes'
+import HHIProveedores from './HHIProveedores'
 
 // ── Sub-tabs ──────────────────────────────────────────────────────────────
 const SUB_TABS = [
-  { id: 'acreditacion', label: 'Acreditación de Saldos',    icon: '📋' },
-  { id: 'hhi',          label: 'HHI de Fuentes de Ingreso', icon: '📈' },
+  { id: 'acreditacion',    label: 'Acreditación de Saldos',    icon: '📋' },
+  { id: 'hhi',            label: 'HHI de Fuentes de Ingreso', icon: '📈' },
+  { id: 'hhi_proveedores', label: 'HHI Proveedores',            icon: '🏪' },
 ]
 
 // ── Paleta de niveles de riesgo (Acreditación de Saldos) ─────────────────
@@ -210,8 +212,9 @@ export default function SostenibilidadRiesgo() {
       </div>
 
       <div className="sub-tab-content">
-        {subTab === 'acreditacion' && <AcreditacionSaldos periodo={periodo} />}
-        {subTab === 'hhi'          && <HHIFuentes periodos={periodos} periodo={periodo} />}
+        {subTab === 'acreditacion'    && <AcreditacionSaldos periodo={periodo} />}
+        {subTab === 'hhi'            && <HHIFuentes periodos={periodos} periodo={periodo} />}
+        {subTab === 'hhi_proveedores' && <HHIProveedores periodo={periodo} />}
       </div>
     </div>
   )

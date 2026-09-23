@@ -3,7 +3,7 @@ import ReactECharts from 'echarts-for-react'
 import api from '../../lib/api'
 import { fmtMM, fmtMonedaCorto, fmtN } from '../../lib/format'
 import { useChartColors } from '../../hooks/useChartColors'
-import { useMoneyFmt } from './FichaSostenedor'
+import { useMoneyFmt } from '../../components/DashboardWidgets'
 import SqlViewer from '../../components/SqlViewer'
 
 // ── Paleta de niveles de riesgo ───────────────────────────────────────────

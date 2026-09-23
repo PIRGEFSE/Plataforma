@@ -1,0 +1,446 @@
+import { useEffect, useState, useCallback, useRef, useContext } from 'react'
+import ReactECharts from 'echarts-for-react'
+import api from '../../lib/api'
+import { useAuth } from '../../hooks/useAuth'
+import { useChartColors } from '../../hooks/useChartColors'
+import { RIESGO_COLORS, EF_COLORS, ESTADO_LABELS, ESTADO_COLORS, COLORS_CHART, ENS_MAP } from '../../lib/edu-constants'
+import { 
+  MoneyFmtCtx, KPICard, PeriodoSelector, UnitSelector, 
+  BreadcrumbHeader, StickyDashboardHeader, getEnsenanzas, buildMoneyFormatters, fmtN
+} from '../../components/DashboardWidgets'
+
+const SECTION_TITLES = {
+  perfil:     { icon:'🏫', label:'Mi Establecimiento' },
+  financiero: { icon:'💵', label:'Financiero — Serie Temporal' },
+  eficiencia: { icon:'⚙️', label:'Eficiencia del Gasto — Serie Temporal' },
+  riesgo:     { icon:'📊', label:'Riesgo — Acreditación de Saldos' },
+  subvencion: { icon:'🏷️', label:'Subvenciones' },
+  sned_grupo: { icon:'🏆', label:'Grupo Homogéneo SNED' },
+}
+
+export default function FichaEstablecimiento({ section='perfil' }) {
+  const { user } = useAuth()
+  const rbdId = user?.rbd_id || 2979
+
+  const [perfil, setPerfil]           = useState(null)
+  const [detalleData, setDetalleData] = useState(null)
+  const [subvData, setSubvData]       = useState([])
+  const [snedData, setSnedData]       = useState(null)
+  const [periodos, setPeriodos]       = useState([2020,2021,2022,2023,2024])
+  const [periodo, setPeriodo]         = useState(2024)
+  const [unitMode, setUnitMode]       = useState('mM')
+  const [loading, setLoading]         = useState(true)
+
+  const { fmtAmt, fmtAxisAmt, unitLabel } = buildMoneyFormatters(unitMode)
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/dashboard/ficha-rbd?rbd=${rbdId}&periodo=${periodo}`).then(r => {
+      setPerfil(r.data.perfil)
+      if (r.data.periodos_disponibles?.length) {
+        setPeriodos(prev => [...new Set([...r.data.periodos_disponibles, ...prev])].sort((a,b)=>b-a))
+      }
+    }).finally(() => setLoading(false))
+  }, [rbdId, periodo])
+
+  const fetchDetalle = useCallback(() => {
+    api.get(`/dashboard/ficha-rbd/detalle?rbd=${rbdId}`).then(r => setDetalleData(r.data))
+  }, [rbdId])
+
+  useEffect(() => { fetchDetalle() }, [fetchDetalle])
+
+  useEffect(() => {
+    if (section === 'subvencion') {
+      const p = periodo ? `&periodo=${periodo}` : ''
+      api.get(`/dashboard/subvencion-rbd?rbd=${rbdId}${p}`).then(r => setSubvData(r.data))
+    }
+  }, [rbdId, periodo, section])
+
+  useEffect(() => {
+    if (section === 'sned_grupo') {
+      api.get(`/dashboard/ficha-rbd/sned-grupo?rbd=${rbdId}&periodo=${periodo}`)
+         .then(r => setSnedData(r.data))
+    }
+  }, [rbdId, periodo, section])
+
+  const sec = SECTION_TITLES[section] ?? SECTION_TITLES.perfil
+
+  if (loading || !perfil) return (
+    <div className="tab-page">
+      <StickyDashboardHeader title={`${sec.icon} Cargando...`} />
+      <div className="loading-area"><div className="spinner"/></div>
+    </div>
+  )
+
+  return (
+    <MoneyFmtCtx.Provider value={{ fmtAmt, fmtAxisAmt, unitLabel }}>
+      <div className="tab-page">
+        <StickyDashboardHeader 
+          title={`${sec.icon} ${perfil?.nom_rbd ?? `RBD ${rbdId}`}`}
+          subtitle={`${sec.label} · RBD ${rbdId} ${perfil.nombre_sostenedor ? `· ${perfil.nombre_sostenedor}` : ''}`}
+        >
+          <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+          {section !== 'perfil' && section !== 'sned_grupo' && section !== 'subvencion' && (
+             <UnitSelector value={unitMode} onChange={setUnitMode} />
+          )}
+          
+          <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-strong)',fontSize:'0.78rem',fontWeight:600}}>
+            🏫 RBD {rbdId}
+          </span>
+          {perfil?.rural_rbd && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--warning-dim)',color:'var(--warning-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🌿 Rural</span>}
+          {perfil?.convenio_pie && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'var(--accent-dim)',color:'var(--accent-text)',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🔵 PIE</span>}
+          {perfil?.pace && <span style={{padding:'0.3rem 0.8rem',borderRadius:999,background:'rgba(139,92,246,0.10)',color:'#a78bfa',border:'1px solid var(--line-default)',fontSize:'0.78rem',fontWeight:600}}>🎓 PACE</span>}
+        </StickyDashboardHeader>
+
+        {section === 'perfil'     && <TabPerfil perfil={perfil} detalleData={detalleData} periodo={periodo} />}
+        {section === 'financiero' && <TabFinanciero detalleData={detalleData} />}
+        {section === 'eficiencia' && <TabEficiencia detalleData={detalleData} />}
+        {section === 'riesgo'     && <TabRiesgo detalleData={detalleData} />}
+        {section === 'subvencion' && <TabSubvencion data={subvData} periodo={periodo} />}
+        {section === 'sned_grupo' && <TabGrupoSNED snedData={snedData} periodo={periodo} />}
+      </div>
+    </MoneyFmtCtx.Provider>
+  )
+}
+
+function TabPerfil({ perfil, detalleData, periodo }) {
+  const { fmtAmt } = useContext(MoneyFmtCtx)
+  
+  if (!perfil) return <div className="loading-area"><div className="spinner"/></div>
+  const finUlt = detalleData?.financiero_serie?.slice(-1)[0]
+  const estado = ESTADO_LABELS[perfil.estado_estab] ?? '—'
+  const estadoColor = ESTADO_COLORS[perfil.estado_estab] ?? '#64748b'
+
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="Mi Establecimiento" mainIcon="🏫" subLabel={`Perfil ${periodo}`} subIcon="📄" />
+      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
+        <KPICard icon="👨‍🎓" label="Matrícula Total" value={fmtN(perfil.mat_total)} color="#1d4ed8"/>
+        <KPICard icon="📈" label="Último Ingreso" value={finUlt ? fmtAmt(finUlt.ingreso) : '—'} color="#1e40af" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
+        <KPICard icon="📉" label="Último Gasto" value={finUlt ? fmtAmt(finUlt.gasto) : '—'} color="#3b82f6" sub={finUlt ? `Año ${finUlt.periodo}` : ''}/>
+        <KPICard icon="⚖️" label="Superávit" value={finUlt ? fmtAmt(finUlt.superavit) : '—'} color={finUlt && finUlt.superavit>=0 ? '#059669':'#dc2626'}/>
+      </div>
+      <div className="chart-card" style={{marginBottom:'1.5rem'}}>
+        <h3 className="chart-title">Datos del Establecimiento</h3>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'1rem',marginTop:'0.75rem'}}>
+          {[
+            {label:'RBD',val:perfil.rbd,icon:'🔢'},
+            {label:'Nombre',val:perfil.nom_rbd,icon:'🏫'},
+            {label:'Estado',val:<span style={{color:estadoColor,fontWeight:600}}>{estado}</span>,icon:'📌'},
+            {label:'Matrícula Activa',val:perfil.matricula ? 'Sí' : 'No',icon:'✅'},
+            {label:'Sostenedor',val:perfil.nombre_sostenedor,icon:'🏢'},
+            {label:'RUT Sostenedor',val:perfil.rut_sostenedor,icon:'🔑'},
+            {label:'Rural',val:perfil.rural_rbd?'Sí':'No',icon:'🌿'},
+            {label:'Convenio PIE',val:perfil.convenio_pie?'Sí':'No',icon:'🔵'},
+            {label:'PACE',val:perfil.pace?'Sí':'No',icon:'🎓'},
+          ].map(({label,val,icon})=>(
+            <div key={label} style={{background:'var(--surface-overlay)',borderRadius:'0.5rem',padding:'0.75rem',border:'1px solid var(--line-subtle)'}}>
+              <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.25rem'}}>{icon} {label}</div>
+              <div style={{color:'var(--text-primary)',fontWeight:600,fontSize:'0.9rem'}}>{val||'—'}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:'1rem'}}>
+          <div style={{fontSize:'0.72rem',color:'var(--text-muted)',marginBottom:'0.4rem'}}>🎓 Tipos de Enseñanza</div>
+          {getEnsenanzas(perfil)}
+        </div>
+      </div>
+      {detalleData?.financiero_serie?.length > 0 && (
+        <div className="chart-card">
+          <h3 className="chart-title">Resumen Financiero Histórico</h3>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.8rem'}}>
+              <thead>
+                <tr style={{background:'var(--surface-overlay)'}}>
+                  {['Año','Ingresos','Gastos','Superávit'].map(h=>(
+                    <th key={h} style={{padding:'0.6rem 1rem',color:'var(--text-muted)',fontWeight:600,textAlign:'right',borderBottom:'1px solid var(--line-default)'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...detalleData.financiero_serie].reverse().map((r,i)=>(
+                  <tr key={r.periodo} style={{borderBottom:'1px solid var(--line-subtle)',background:i%2===0?'transparent':'var(--surface-overlay)'}}>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--text-secondary)',textAlign:'right'}}>{r.periodo}</td>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--success)',textAlign:'right'}}>{fmtAmt(r.ingreso)}</td>
+                    <td style={{padding:'0.5rem 1rem',color:'var(--danger)',textAlign:'right'}}>{fmtAmt(r.gasto)}</td>
+                    <td style={{padding:'0.5rem 1rem',textAlign:'right'}}>
+                      <strong style={{color:Number(r.superavit)>=0?'var(--success)':'var(--danger)'}}>{fmtAmt(r.superavit)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function TabFinanciero({ detalleData }) {
+  const C = useChartColors()
+  const { fmtAmt, fmtAxisAmt, unitLabel } = useContext(MoneyFmtCtx)
+  
+  const serie = detalleData?.financiero_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos financieros.</div>
+
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      let sup = 0
+      params.forEach(p => { html += `${p.marker} ${p.seriesName}: <b>${fmtAmt(p.value)}</b><br/>`; if (p.seriesName==='Ingreso') sup+=p.value; if (p.seriesName==='Gasto') sup-=p.value })
+      html += `<hr style="margin:4px 0;border-color:var(--line-subtle)"/>Superávit: <b style="color:${sup>=0?'#10b981':'#ef4444'}">${fmtAmt(sup)}</b>`
+      return html
+    }},
+    legend: { data: ['Ingreso', 'Gasto'], textStyle: { color: C.axisLabel } },
+    color: ['#1e40af', '#3b82f6'],
+    grid: { left: 80, right: 20, bottom: 40, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', axisLabel: { color: C.axisLabel, formatter: v => fmtAxisAmt(v) }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: 'Ingreso', type: 'bar', data: serie.map(d => Number(d.ingreso)), barMaxWidth: 40, itemStyle: { borderRadius: [4, 4, 0, 0] } },
+      { name: 'Gasto', type: 'bar', data: serie.map(d => Number(d.gasto)), barMaxWidth: 40, itemStyle: { borderRadius: [4, 4, 0, 0] } }
+    ],
+    backgroundColor: 'transparent'
+  }
+
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="Financiero" mainIcon="💵" subLabel="Evolución Histórica" subIcon="📈" />
+      <div className="chart-card">
+        <h3 className="chart-title">Evolución Ingreso vs Gasto ({unitLabel})</h3>
+        <ReactECharts option={option} style={{ height: 400 }} />
+      </div>
+    </>
+  )
+}
+
+function TabEficiencia({ detalleData }) {
+  const C = useChartColors()
+  const { fmtAmt, unitLabel } = useContext(MoneyFmtCtx)
+  
+  const serie = detalleData?.eficiencia_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos de eficiencia.</div>
+
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      params.forEach(p => { html += `${p.marker} ${p.seriesName}: <b>${p.value}%</b><br/>` })
+      return html
+    }},
+    legend: { data: ['% Aula', '% Admin', '% Otros'], textStyle: { color: C.axisLabel }, bottom: 0 },
+    color: ['#059669', '#d97706', '#64748b'],
+    grid: { left: 40, right: 20, bottom: 60, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: '% Aula', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_aula)), barMaxWidth: 60 },
+      { name: '% Admin', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_admin)), barMaxWidth: 60 },
+      { name: '% Otros', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_otros)), barMaxWidth: 60, itemStyle: { borderRadius: [4, 4, 0, 0] } }
+    ],
+    backgroundColor: 'transparent'
+  }
+
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="Eficiencia del Gasto" mainIcon="⚙️" subLabel="Distribución Porcentual" subIcon="📊" />
+      <div className="chart-card">
+        <h3 className="chart-title">Distribución del Gasto (%)</h3>
+        <ReactECharts option={option} style={{ height: 400 }} />
+      </div>
+    </>
+  )
+}
+
+function TabRiesgo({ detalleData }) {
+  const C = useChartColors()
+  const { fmtAmt, unitLabel } = useContext(MoneyFmtCtx)
+  
+  const serie = detalleData?.acreditacion_serie ?? []
+  if (!serie.length) return <div className="alert-info">No hay datos de acreditación.</div>
+
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, ...C.tooltip, formatter: params => {
+      let html = `<b>Año ${params[0].name}</b><br/>`
+      const rendido = params.find(p => p.seriesName === '% Rendido')
+      const noRendido = params.find(p => p.seriesName === '% No Rendido')
+      if (rendido) html += `${rendido.marker} ${rendido.seriesName}: <b>${rendido.value}%</b><br/>`
+      if (noRendido) html += `${noRendido.marker} ${noRendido.seriesName}: <b>${noRendido.value}%</b><br/>`
+      return html
+    }},
+    legend: { data: ['% Rendido', '% No Rendido'], textStyle: { color: C.axisLabel }, bottom: 0 },
+    color: ['#059669', '#dc2626'],
+    grid: { left: 40, right: 20, bottom: 60, top: 40 },
+    xAxis: { type: 'category', data: serie.map(d => d.periodo), axisLine: { lineStyle: { color: C.splitLine } }, axisLabel: { color: C.axisLabel } },
+    yAxis: { type: 'value', max: 100, axisLabel: { color: C.axisLabel, formatter: '{value}%' }, splitLine: { lineStyle: { color: C.splitLine } } },
+    series: [
+      { name: '% Rendido', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_rendido)), barMaxWidth: 60 },
+      { name: '% No Rendido', type: 'bar', stack: 'total', data: serie.map(d => Number(d.pct_no_rendido)), barMaxWidth: 60, itemStyle: { borderRadius: [4, 4, 0, 0] } }
+    ],
+    backgroundColor: 'transparent'
+  }
+
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="Riesgo de Reintegro" mainIcon="📊" subLabel="Acreditación de Saldos" subIcon="🛡️" />
+      <div className="chart-card">
+        <h3 className="chart-title">Acreditación de Saldos (Serie Temporal)</h3>
+        <ReactECharts option={option} style={{ height: 400 }} />
+      </div>
+    </>
+  )
+}
+
+function TabSubvencion({ data, periodo }) {
+  const C = useChartColors()
+  const { fmtAmt, unitLabel } = useContext(MoneyFmtCtx)
+  
+  if (!data || data.length === 0) return <div className="alert-info">No hay datos de subvenciones para {periodo || 'este período'}.</div>
+
+  const total = data.reduce((s, d) => s + Number(d.monto_total), 0)
+  
+  const option = {
+    aria: { decal: { show: true } },
+    tooltip: { trigger: 'item', ...C.tooltip, formatter: p => `<b>${p.name}</b><br/>Monto: <b>${fmtAmt(p.value)}</b> (${p.percent}%)` },
+    legend: { orient: 'vertical', left: 'left', textStyle: { color: C.axisLabel } },
+    color: COLORS_CHART,
+    series: [
+      {
+        name: 'Subvenciones', type: 'pie', radius: ['40%', '70%'], center: ['65%', '50%'],
+        itemStyle: { borderRadius: 10, borderColor: C.bg, borderWidth: 2 },
+        label: { show: false, position: 'center' },
+        emphasis: { label: { show: true, fontSize: '14', fontWeight: 'bold', color: C.axisLabel } },
+        labelLine: { show: false },
+        data: data.map(d => ({ value: Number(d.monto_total), name: d.subvencion_alias }))
+      }
+    ],
+    backgroundColor: 'transparent'
+  }
+
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="Subvenciones" mainIcon="🏷️" subLabel={`Distribución ${periodo || 'Histórica'}`} subIcon="🥧" />
+      <div className="kpi-grid" style={{marginBottom:'1.5rem'}}>
+        <KPICard icon="💰" label="Monto Total" value={fmtAmt(total)} color="#8b5cf6" sub={`En ${periodo || 'total histórico'}`}/>
+        <KPICard icon="📋" label="Líneas de Subvención" value={data.length} color="#ec4899" />
+      </div>
+      <div className="chart-card">
+        <h3 className="chart-title">Composición por Subvención ({unitLabel})</h3>
+        <ReactECharts option={option} style={{ height: 450 }} />
+      </div>
+    </>
+  )
+}
+
+// ── NUEVO TAB: GRUPO HOMOGÉNEO SNED ───────────────────────────────────────────
+function TabGrupoSNED({ snedData, periodo }) {
+  if (!snedData) return <div className="loading-area"><div className="spinner"/></div>
+  if (!snedData.grupo_homogeneo) {
+    return (
+      <div className="chart-card">
+        <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          No se encontró grupo homogéneo SNED para este establecimiento en el año {snedData.agno_sned} (periodo contable {periodo}).
+        </p>
+      </div>
+    )
+  }
+
+  const { mi_establecimiento, establecimientos, grupo_homogeneo, agno_sned } = snedData
+  
+  // Establecimientos con 100% de excelencia
+  const EE100 = establecimientos || []
+  
+  return (
+    <>
+      <BreadcrumbHeader mainLabel="SNED" mainIcon="🏆" subLabel="Grupo Homogéneo" subIcon="🎯" />
+      
+      <div className="alert-info" style={{ marginBottom: '1.5rem', borderRadius: '8px' }}>
+        ℹ️ Estás visualizando los resultados del Sistema Nacional de Evaluación de Desempeño (SNED) para el año de proceso <strong>{agno_sned}</strong>. 
+        Se muestran exclusivamente los establecimientos que obtuvieron un <strong>100% de la Subvención de Excelencia</strong>.
+      </div>
+
+      <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+        <KPICard 
+          icon="👥" label="Grupo Homogéneo" 
+          value={grupo_homogeneo.split('-').pop()?.trim() || "Grupo"} 
+          color="#1e40af" 
+          sub={grupo_homogeneo.length > 25 ? grupo_homogeneo.slice(0, 25) + '...' : ''}
+        />
+        <KPICard 
+          icon="🏫" label="Total EE en el Grupo" 
+          value={mi_establecimiento?.n_establecimientos_gh ?? '—'} 
+          color="#3b82f6" 
+        />
+        <KPICard 
+          icon="🏆" label="Posición del EE" 
+          value={mi_establecimiento?.posicion_gh ?? '—'} 
+          color={
+            mi_establecimiento?.seleccionado_sned?.toLowerCase().includes('100%') ? '#10b981' :
+            mi_establecimiento?.seleccionado_sned?.toLowerCase().includes('60%') ? '#f59e0b' : '#ef4444'
+          }
+        />
+        <KPICard 
+          icon="🥇" label="Estado SNED del EE" 
+          value={mi_establecimiento?.seleccionado_sned?.includes('%') ? 
+                  mi_establecimiento.seleccionado_sned.split(' ')[0] : 'No Premiado'} 
+          color={
+            mi_establecimiento?.seleccionado_sned?.toLowerCase().includes('100%') ? '#10b981' :
+            mi_establecimiento?.seleccionado_sned?.toLowerCase().includes('60%') ? '#f59e0b' : '#ef4444'
+          }
+        />
+      </div>
+
+      <div className="chart-card">
+        <h3 className="chart-title">Establecimientos del mismo Grupo con 100% SNED</h3>
+        <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-overlay)' }}>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'center', borderBottom: '1px solid var(--line-subtle)', color: 'var(--text-muted)' }}>Posición</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid var(--line-subtle)', color: 'var(--text-muted)' }}>RBD</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid var(--line-subtle)', color: 'var(--text-muted)' }}>Nombre Establecimiento</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid var(--line-subtle)', color: 'var(--text-muted)' }}>Estado SNED</th>
+              </tr>
+            </thead>
+            <tbody>
+              {EE100.length === 0 ? (
+                <tr>
+                  <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Ningún establecimiento en este grupo obtuvo el 100% de excelencia.
+                  </td>
+                </tr>
+              ) : (
+                EE100.map((e, idx) => {
+                  const isMe = mi_establecimiento && e.rbd === mi_establecimiento.rbd
+                  return (
+                    <tr key={e.rbd} style={{ 
+                      borderBottom: '1px solid var(--line-subtle)', 
+                      background: isMe ? 'var(--accent-dim)' : (idx % 2 === 0 ? 'transparent' : 'var(--surface-overlay)') 
+                    }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: isMe ? 700 : 500 }}>
+                        {e.posicion_gh}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', color: isMe ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                        {e.rbd}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: isMe ? 600 : 400, color: isMe ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                        {e.nom_rbd}
+                        {isMe && <span style={{ marginLeft: '0.5rem', background: 'var(--accent)', color: 'white', padding: '0.15rem 0.5rem', borderRadius: 999, fontSize: '0.7rem' }}>Mi Establecimiento</span>}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#10b981', fontWeight: 600 }}>
+                        100% Subv. Excelencia
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}

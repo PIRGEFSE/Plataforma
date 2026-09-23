@@ -17,7 +17,6 @@ import ConvivenciaEscolar from './ConvivenciaEscolar'
 import SIMCESostenedor from './SIMCESostenedor'
 import { RenderComplejidadEducativa } from './ComplejidadEducativa'
 import { RenderHHISostenedor } from './HHISostenedor'
-import { RenderHHIProveedoresSostenedor } from './HHIProveedoresSostenedor'
 import { AcreditacionSaldos } from './AcreditacionSaldos'
 import { RenderCostoAlumno } from './CostoAlumno'
 import { RenderGastoAdministrativo } from './GastoAdministrativo'
@@ -27,53 +26,46 @@ import { TabPresupuesto } from './Presupuesto'
 import { TabPerfil } from './PerfilSostenedor'
 import { TabSostenibilidad } from './Sostenibilidad'
 import { RenderInnovacionPedagogica, RenderInnovacionPedagogicaWidget } from './InnovacionPedagogicaSostenedor'
-import ProyeccionSaldos from './ProyeccionSaldos'
-import { RenderDotacionDocente } from './DotacionDocente'
 
 // ── Catálogo de Widgets fijables al Resumen ────────────────────────────────────
 export const SOSTENEDOR_WIDGETS = [
   // Educativo - Financiero
   { key: 'ef_ingreso_gasto', label: 'Ingreso vs Gasto por EE', section: 'educativo_financiero', icon: '💵', color: '#10b981', grupo: 'Educativo - Financiero' },
   { key: 'ef_superavit', label: 'Superávit / Déficit por EE', section: 'educativo_financiero', icon: '⚖️', color: '#6366f1', grupo: 'Educativo - Financiero' },
-  { key: 'ef_sned_kpis', label: '12. SNED — KPIs de Desempeño', section: 'educativo_financiero', icon: '🏆', color: '#1e40af', grupo: 'Educativo - Financiero' },
-  { key: 'ef_sned_tabla', label: '12. SNED — Detalle Establecimientos', section: 'educativo_financiero', icon: '📋', color: '#3b82f6', grupo: 'Educativo - Financiero' },
-  { key: 'ef_sned_scatter', label: '12. SNED — Puntaje vs Ingreso', section: 'educativo_financiero', icon: '🔵', color: '#60a5fa', grupo: 'Educativo - Financiero' },
-  { key: 'ef_sned_posicion', label: '12. SNED — Posición en Grupo', section: 'educativo_financiero', icon: '📊', color: '#1e3a8a', grupo: 'Educativo - Financiero' },
-  { key: 'ef_sned_radar', label: '12. SNED — Radar de Indicadores', section: 'educativo_financiero', icon: '🕸️', color: '#2563eb', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned_kpis', label: 'SNED — KPIs de Desempeño', section: 'educativo_financiero', icon: '🏆', color: '#1e40af', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned_tabla', label: 'SNED — Detalle Establecimientos', section: 'educativo_financiero', icon: '📋', color: '#3b82f6', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned_scatter', label: 'SNED — Puntaje vs Ingreso', section: 'educativo_financiero', icon: '🔵', color: '#60a5fa', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned_posicion', label: 'SNED — Posición en Grupo', section: 'educativo_financiero', icon: '📊', color: '#1e3a8a', grupo: 'Educativo - Financiero' },
+  { key: 'ef_sned_radar', label: 'SNED — Radar de Indicadores', section: 'educativo_financiero', icon: '🕸️', color: '#2563eb', grupo: 'Educativo - Financiero' },
   // Eficiencia del Gasto
   { key: 'eg_distribucion_gasto', label: 'Distribución del Gasto (%)', section: 'eficiencia', icon: '📊', color: '#3b82f6', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_nivel_admin', label: '4. Nivel Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#ef4444', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_costo_alumno_kpis', label: '2. KPIs Costo por Alumno', section: 'eficiencia', icon: '🎓', color: '#10b981', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_costo_alumno_tabla', label: '2. Tabla Costo por Alumno', section: 'eficiencia', icon: '📋', color: '#06b6d4', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_costo_alumno_graficos', label: '2. Gráficos Costo por Alumno', section: 'eficiencia', icon: '📈', color: '#f59e0b', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_gasto_adm_kpis', label: '4. KPIs Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#8b5cf6', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_gasto_adm_tabla', label: '4. Tabla Gasto Adm. por RBD', section: 'eficiencia', icon: '📋', color: '#ec4899', grupo: 'Eficiencia del Gasto' },
-  { key: 'eg_gasto_adm_graficos', label: '4. Gráficos Gasto Administrativo', section: 'eficiencia', icon: '📊', color: '#f97316', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_nivel_admin', label: 'Nivel Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#ef4444', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_kpis', label: 'KPIs Costo por Alumno', section: 'eficiencia', icon: '🎓', color: '#10b981', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_tabla', label: 'Tabla Costo por Alumno', section: 'eficiencia', icon: '📋', color: '#06b6d4', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_costo_alumno_graficos', label: 'Gráficos Costo por Alumno', section: 'eficiencia', icon: '📈', color: '#f59e0b', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_kpis', label: 'KPIs Gasto Administrativo', section: 'eficiencia', icon: '💼', color: '#8b5cf6', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_tabla', label: 'Tabla Gasto Adm. por RBD', section: 'eficiencia', icon: '📋', color: '#ec4899', grupo: 'Eficiencia del Gasto' },
+  { key: 'eg_gasto_adm_graficos', label: 'Gráficos Gasto Administrativo', section: 'eficiencia', icon: '📊', color: '#f97316', grupo: 'Eficiencia del Gasto' },
   // Sostenibilidad y Riesgo — Acreditación de Saldos
-  { key: 'sr_acreditacion_grafico', label: '6. Acreditación — Gráfico % Rendido', section: 'sostenibilidad_riesgo', icon: '📊', color: '#6366f1', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_acreditacion_monto', label: '6. Acreditación — Top Monto No Rendido', section: 'sostenibilidad_riesgo', icon: '💸', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_acreditacion_grafico', label: 'Acreditación — Gráfico % Rendido', section: 'sostenibilidad_riesgo', icon: '📊', color: '#6366f1', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_acreditacion_monto', label: 'Acreditación — Top Monto No Rendido', section: 'sostenibilidad_riesgo', icon: '💸', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
   // Sostenibilidad y Riesgo — Sostenibilidad Rem./Ingreso
-  { key: 'sr_sostenibilidad_ratio', label: '5. Ratio Remuneraciones / Ingresos', section: 'sostenibilidad_riesgo', icon: '🛡️', color: '#f59e0b', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_sostenibilidad_scatter', label: '5. Funcionarios vs Ingresos (Scatter)', section: 'sostenibilidad_riesgo', icon: '🔵', color: '#22d3ee', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_sostenibilidad_ratio', label: 'Ratio Remuneraciones / Ingresos', section: 'sostenibilidad_riesgo', icon: '🛡️', color: '#f59e0b', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_sostenibilidad_scatter', label: 'Funcionarios vs Ingresos (Scatter)', section: 'sostenibilidad_riesgo', icon: '🔵', color: '#22d3ee', grupo: 'Sostenibilidad y Riesgo' },
   // Sostenibilidad y Riesgo — HHI
-  { key: 'sr_hhi_graficos', label: '11. HHI — Distribución y Evolución', section: 'sostenibilidad_riesgo', icon: '💰', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_hhi_fuentes', label: '11. HHI — Composición Fuentes de Ingreso', section: 'sostenibilidad_riesgo', icon: '📋', color: '#8b5cf6', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_hhi_detalle', label: '11. HHI — Serie Temporal por Período', section: 'sostenibilidad_riesgo', icon: '📈', color: '#f97316', grupo: 'Sostenibilidad y Riesgo' },
-  // Sostenibilidad y Riesgo — HHI Proveedores
-  { key: 'sr_hhi_prov_graficos',   label: 'HHI Proveedores — Distribución y Evolución',  section: 'sostenibilidad_riesgo', icon: '🏪', color: '#7c3aed', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_hhi_prov_composicion', label: 'HHI Proveedores — Composición',               section: 'sostenibilidad_riesgo', icon: '📋', color: '#6d28d9', grupo: 'Sostenibilidad y Riesgo' },
-  { key: 'sr_hhi_prov_detalle',    label: 'HHI Proveedores — Serie Temporal',              section: 'sostenibilidad_riesgo', icon: '📈', color: '#4c1d95', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_hhi_graficos', label: 'HHI — Distribución y Evolución', section: 'sostenibilidad_riesgo', icon: '💰', color: '#ef4444', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_hhi_fuentes', label: 'HHI — Composición Fuentes de Ingreso', section: 'sostenibilidad_riesgo', icon: '📋', color: '#8b5cf6', grupo: 'Sostenibilidad y Riesgo' },
+  { key: 'sr_hhi_detalle', label: 'HHI — Serie Temporal por Período', section: 'sostenibilidad_riesgo', icon: '📈', color: '#f97316', grupo: 'Sostenibilidad y Riesgo' },
   // Comportamiento Financiero
-  { key: 'cf_gasto_rem', label: '9. Gastos Rem. sobre Ingreso Dep.', section: 'comportamiento_financiero', icon: '📉', color: '#f59e0b', grupo: 'Comportamiento Financiero' },
-  { key: 'cf_analisis_rendicion', label: '7. Análisis Rendición', section: 'comportamiento_financiero', icon: '📋', color: '#6366f1', grupo: 'Comportamiento Financiero' },
-  { key: 'cf_proyeccion_saldos', label: '8. Proyección Saldos Iniciales', section: 'comportamiento_financiero', icon: '🔮', color: '#8b5cf6', grupo: 'Comportamiento Financiero' },
+  { key: 'cf_gasto_rem', label: 'Gastos Rem. sobre Ingreso Dep.', section: 'comportamiento_financiero', icon: '📉', color: '#f59e0b', grupo: 'Comportamiento Financiero' },
+  { key: 'cf_analisis_rendicion', label: 'Análisis Rendición', section: 'comportamiento_financiero', icon: '📋', color: '#6366f1', grupo: 'Comportamiento Financiero' },
   // Territorio — Complejidad Educativa
-  { key: 'te_complejidad_prioridades', label: '1. Complejidad — Distribución Prioridades', section: 'territorio', icon: '📊', color: '#f59e0b', grupo: 'Territorio' },
-  { key: 'te_complejidad_scatter', label: '1. Complejidad — IVE vs Ingreso', section: 'territorio', icon: '🔵', color: '#3b82f6', grupo: 'Territorio' },
+  { key: 'te_complejidad_prioridades', label: 'Complejidad — Distribución Prioridades', section: 'territorio', icon: '📊', color: '#f59e0b', grupo: 'Territorio' },
+  { key: 'te_complejidad_scatter', label: 'Complejidad — IVE vs Ingreso', section: 'territorio', icon: '🔵', color: '#3b82f6', grupo: 'Territorio' },
   // Territorio — Gasto Educativo
-  { key: 'te_gasto_kpis', label: '3. Gasto Educativo — KPIs', section: 'territorio', icon: '💰', color: '#22d3ee', grupo: 'Territorio' },
-  { key: 'te_gasto_tabla', label: '3. Gasto Educativo — Tabla por Centro', section: 'territorio', icon: '📋', color: '#ec4899', grupo: 'Territorio' },
-  { key: 'te_gasto_graficos', label: '3. Gasto Educativo — Gráficos', section: 'territorio', icon: '📈', color: '#84cc16', grupo: 'Territorio' },
+  { key: 'te_gasto_kpis', label: 'Gasto Educativo — KPIs', section: 'territorio', icon: '💰', color: '#22d3ee', grupo: 'Territorio' },
+  { key: 'te_gasto_tabla', label: 'Gasto Educativo — Tabla por Centro', section: 'territorio', icon: '📋', color: '#ec4899', grupo: 'Territorio' },
+  { key: 'te_gasto_graficos', label: 'Gasto Educativo — Gráficos', section: 'territorio', icon: '📈', color: '#84cc16', grupo: 'Territorio' },
 ]
 
 const WIDGET_MAP = Object.fromEntries(SOSTENEDOR_WIDGETS.map(w => [w.key, w]))
@@ -183,7 +175,7 @@ const SECTION_TITLES = {
   resumen: { icon: '🗂️', label: 'Resumen Personalizado' },
   geo_establecimiento: { icon: '📍', label: 'Geo Localización' },
   convivencia: { icon: '🤝', label: 'Convivencia Escolar' },
-  simce: { icon: '📝', label: 'SIMCE — Tendencia Histórica' },
+  simce: { icon: '📈', label: 'SIMCE — Tendencia Histórica' },
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
@@ -204,21 +196,6 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   const [periodo, setPeriodo] = useState(2024)
   const [periodos, setPeriodos] = useState([2020, 2021, 2022, 2023, 2024])
   const [unitMode, setUnitMode] = useState('mM')
-  const [cfSubTab, setCfSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-comportamiento') || 'gasto_rem')
-  const [srSubTab, setSrSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-sostenibilidad-riesgo') || 'acreditacion')
-  // Contexto ampliado (grupo homogéneo)
-  const [esContextoAmpliado, setEsContextoAmpliado] = useState(false)
-  const [grupoHomogeneoCtx, setGrupoHomogeneoCtx] = useState(null)
-  const [rbdsContextoStr, setRbdsContextoStr] = useState(null)
-
-  useEffect(() => {
-    const handler = (e) => { 
-      if (e.detail.key === 'pirgefse-fichasost-comportamiento') setCfSubTab(e.detail.val) 
-      if (e.detail.key === 'pirgefse-fichasost-sostenibilidad-riesgo') setSrSubTab(e.detail.val)
-    }
-    window.addEventListener('pirgefse-subtab', handler)
-    return () => window.removeEventListener('pirgefse-subtab', handler)
-  }, [])
 
   // Funciones de formato monetario según unidad seleccionada
   const { fmtAmt, fmtAxisAmt, unitLabel } = buildMoneyFormatters(unitMode)
@@ -233,10 +210,6 @@ export default function FichaSostenedor({ section = 'perfil' }) {
       .then(r => {
         setPerfil(r.data.perfil)
         setEstablecimientos(r.data.establecimientos)
-        // Contexto ampliado (grupo homogéneo)
-        setEsContextoAmpliado(r.data.es_contexto_ampliado ?? false)
-        setGrupoHomogeneoCtx(r.data.grupo_homogeneo_contexto ?? null)
-        setRbdsContextoStr(r.data.rbds_contexto_str ?? null)
         // Actualizar períodos disponibles desde la fuente de dimensiones
         if (r.data.periodos_disponibles?.length) {
           setPeriodos(prev => {
@@ -251,8 +224,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   // Carga detalle por RBD (financiero, eficiencia, etc.)
   const fetchRbd = useCallback((per) => {
     setLoadingRbd(true)
-    const rbdsParam = rbdsContextoStr ? `&rbds_contexto=${encodeURIComponent(rbdsContextoStr)}` : ''
-    api.get(`/dashboard/ficha-sostenedor/detalle-rbd?sost_id=${sostId}&periodo=${per}${rbdsParam}`)
+    api.get(`/dashboard/ficha-sostenedor/detalle-rbd?sost_id=${sostId}&periodo=${per}`)
       .then(r => {
         setRdbData(r.data)
         if (r.data.periodos_disponibles?.length) {
@@ -263,7 +235,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
         }
       })
       .finally(() => setLoadingRbd(false))
-  }, [sostId, rbdsContextoStr])
+  }, [sostId])
 
   useEffect(() => {
     fetchRbd(periodo)
@@ -273,8 +245,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
   useEffect(() => {
     if (section !== 'territorio' && section !== 'resumen') return
     setLoadingTerritorio(true)
-    const rbdsParam = rbdsContextoStr ? `&rbds_contexto=${encodeURIComponent(rbdsContextoStr)}` : ''
-    api.get(`/dashboard/ficha-sostenedor/territorio?sost_id=${sostId}&periodo=${periodo}${rbdsParam}`)
+    api.get(`/dashboard/ficha-sostenedor/territorio?sost_id=${sostId}&periodo=${periodo}`)
       .then(r => {
         setTerritorioData(r.data)
         if (r.data.periodos_disponibles?.length) {
@@ -285,7 +256,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
         }
       })
       .finally(() => setLoadingTerritorio(false))
-  }, [section, sostId, periodo, rbdsContextoStr])
+  }, [section, sostId, periodo])
 
   // Carga datos de Presupuesto
   useEffect(() => {
@@ -328,41 +299,17 @@ export default function FichaSostenedor({ section = 'perfil' }) {
               </p>
             </div>
             <div id="geo-filters-portal" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {section !== 'geo_establecimiento' && section !== 'simce' && !(section === 'comportamiento_financiero' && cfSubTab === 'proyeccion_saldos') && !(section === 'sostenibilidad_riesgo' && srSubTab === 'sostenibilidad') && (
-                <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+              {section !== 'geo_establecimiento' && section !== 'simce' && (
+                <>
+                  <PeriodoSelector periodos={periodos} value={periodo} onChange={setPeriodo} />
+                  <UnitSelector value={unitMode} onChange={setUnitMode} />
+                </>
               )}
-              {section !== 'geo_establecimiento' && (
+              {section === 'simce' && (
                 <UnitSelector value={unitMode} onChange={setUnitMode} />
               )}
             </div>
           </div>
-
-          {/* ── Banner de Contexto Ampliado (Grupo Homogéneo) ────────────────────── */}
-          {esContextoAmpliado && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              margin: '0 0 1.25rem 0',
-              padding: '0.75rem 1.25rem',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: '1.5px solid #f59e0b',
-              color: '#92400e',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-            }}>
-              <span style={{ fontSize: '1.25rem' }}>🔍</span>
-              <div>
-                <strong>Vista ampliada: Grupo Homogéneo</strong>
-                <span style={{ marginLeft: '0.5rem', opacity: 0.85 }}>
-                  Este sostenedor tiene menos de 10 establecimientos. Se muestran los establecimientos del mismo grupo homogéneo
-                  {grupoHomogeneoCtx && <> (<code style={{ fontFamily: 'monospace', background: '#fde68a', padding: '1px 4px', borderRadius: 3 }}>{grupoHomogeneoCtx}</code>)</>}
-                  {' '}para permitir comparación. Los establecimientos propios están marcados en <strong style={{ color: '#1e40af' }}>azul</strong>.
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* ── KPIs solo en Mi Ficha ─────────────────────────────────────────── */}
           {section === 'perfil' && (
@@ -377,18 +324,17 @@ export default function FichaSostenedor({ section = 'perfil' }) {
           {/* ── Contenido por sección ─────────────────────────────────────────── */}
           {section === 'perfil' && (
             <TabPerfil perfil={perfil} establecimientos={establecimientos}
-              financiero_rbd={rdbData?.financiero_rbd ?? []} loadingRbd={loadingRbd}
-              esContextoAmpliado={esContextoAmpliado} grupoHomogeneoCtx={grupoHomogeneoCtx} />
+              financiero_rbd={rdbData?.financiero_rbd ?? []} loadingRbd={loadingRbd} />
           )}
 
           {section !== 'perfil' && section !== 'territorio' && section !== 'resumen' && (
             loadingRbd
               ? <div className="loading-area"><div className="spinner" /></div>
               : <>
-                {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} rbdsContextoStr={rbdsContextoStr} />}
+                {section === 'financiero' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
                 {section === 'educativo_financiero' && <TabEducativoFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} />}
-                {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
-                {section === 'sostenibilidad_riesgo' && <TabSostenibilidadRiesgo rdbData={rdbData} periodo={periodo} sostId={sostId} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
+                {section === 'eficiencia' && <TabEficiencia rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+                {section === 'sostenibilidad_riesgo' && <TabSostenibilidadRiesgo rdbData={rdbData} periodo={periodo} sostId={sostId} />}
                 {section === 'comportamiento_financiero' && <TabComportamientoFinanciero periodo={periodo} sostId={sostId} />}
               </>
           )}
@@ -396,7 +342,7 @@ export default function FichaSostenedor({ section = 'perfil' }) {
           {section === 'territorio' && (
             loadingTerritorio
               ? <div className="loading-area"><div className="spinner" /></div>
-              : <TabTerritorio data={territorioData} periodo={periodo} sostId={sostId} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />
+              : <TabTerritorio data={territorioData} periodo={periodo} sostId={sostId} />
           )}
 
           {section === 'presupuesto' && (
@@ -451,14 +397,14 @@ function TabEducativoFinanciero({ rdbData, periodo, sostId }) {
 
   const SUB_TABS = [
     { key: 'ingreso_gasto', label: 'Ingreso - Gasto', icon: '💵' },
-    { key: 'sned', label: '12. SNED', icon: '🏆' },
+    { key: 'sned', label: 'SNED', icon: '🏆' },
   ]
   const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
 
   return (
     <div>
       <BreadcrumbHeader mainLabel="Educativo - Financiero" mainIcon="📊" subLabel={currentTab.label} subIcon={currentTab.icon} />
-      {subTab === 'ingreso_gasto' && <TabFinanciero rdbData={rdbData} periodo={periodo} sostId={sostId} />}
+      {subTab === 'ingreso_gasto' && <TabFinanciero rdbData={rdbData} periodo={periodo} />}
       {subTab === 'sned' && <SNEDSostenedor sostId={sostId} periodo={periodo} />}
     </div>
   )
@@ -468,7 +414,7 @@ function TabEducativoFinanciero({ rdbData, periodo, sostId }) {
 
 
 // ── Tab: Eficiencia (Sub-tabs) ──────────────────────────────────────────────────
-function TabEficiencia({ rdbData, periodo, sostId, rbdsContextoStr, esContextoAmpliado }) {
+function TabEficiencia({ rdbData, periodo, sostId }) {
   const C = useChartColors()
   const [subTab, setSubTab] = useState(() => localStorage.getItem('pirgefse-fichasost-eficiencia') || 'innovacion')
   useEffect(() => { localStorage.setItem('pirgefse-fichasost-eficiencia', subTab) }, [subTab])
@@ -479,10 +425,9 @@ function TabEficiencia({ rdbData, periodo, sostId, rbdsContextoStr, esContextoAm
   }, [])
 
   const SUB_TABS = [
-    { key: 'innovacion', label: '10. Innovación Pedagógica', icon: '💡' },
-    { key: 'costo', label: '2. Costo por Alumno Educativo', icon: '🎓' },
-    { key: 'administrativo', label: '4. Gasto Administrativo', icon: '💼' },
-    { key: 'dotacion', label: '13. Dotación Docente', icon: '🧑‍🏫' }
+    { key: 'innovacion', label: 'Innovación Pedagógica', icon: '💡' },
+    { key: 'costo', label: 'Costo por Alumno Educativo', icon: '🎓' },
+    { key: 'administrativo', label: 'Gasto Administrativo', icon: '💼' }
   ]
   const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
 
@@ -490,9 +435,8 @@ function TabEficiencia({ rdbData, periodo, sostId, rbdsContextoStr, esContextoAm
     <div>
       <BreadcrumbHeader mainLabel="Eficiencia del Gasto" mainIcon="⚙️" subLabel={currentTab.label} subIcon={currentTab.icon} />
       {subTab === 'innovacion' && <RenderInnovacionPedagogica rdbData={rdbData} periodo={periodo} />}
-      {subTab === 'costo' && <RenderCostoAlumno sostId={sostId} periodo={periodo} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
-      {subTab === 'administrativo' && <RenderGastoAdministrativo sostId={sostId} periodo={periodo} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
-      {subTab === 'dotacion' && <RenderDotacionDocente sostId={sostId} periodo={periodo} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
+      {subTab === 'costo' && <RenderCostoAlumno sostId={sostId} periodo={periodo} />}
+      {subTab === 'administrativo' && <RenderGastoAdministrativo sostId={sostId} periodo={periodo} />}
     </div>
   )
 }
@@ -504,7 +448,7 @@ function TabEficiencia({ rdbData, periodo, sostId, rbdsContextoStr, esContextoAm
 
 
 // ── Tab: Sostenibilidad y Riesgo (con sub-tabs) ─────────────────────────────────────
-function TabSostenibilidadRiesgo({ rdbData, periodo, sostId, rbdsContextoStr, esContextoAmpliado }) {
+function TabSostenibilidadRiesgo({ rdbData, periodo, sostId }) {
   const [subTab, setSubTab] = useState(
     () => localStorage.getItem('pirgefse-fichasost-sostenibilidad-riesgo') || 'acreditacion'
   )
@@ -518,20 +462,18 @@ function TabSostenibilidadRiesgo({ rdbData, periodo, sostId, rbdsContextoStr, es
   }, [])
 
   const SUB_TABS = [
-    { key: 'acreditacion', label: '6. Acreditación de Saldos', icon: '📊' },
-    { key: 'sostenibilidad', label: '5. Variación interanual de ingresos', icon: '🛡️' },
-    { key: 'hhi', label: '11. HHI de Fuentes de Ingreso', icon: '💰' },
-    { key: 'hhi_proveedores', label: 'HHI Proveedores', icon: '🏪' },
+    { key: 'acreditacion', label: 'Acreditación de Saldos', icon: '📊' },
+    { key: 'sostenibilidad', label: 'Sostenibilidad Rem./Ingreso', icon: '🛡️' },
+    { key: 'hhi', label: 'HHI de Fuentes de Ingreso', icon: '💰' },
   ]
   const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
 
   return (
     <div>
       <BreadcrumbHeader mainLabel="Sostenibilidad y Riesgo" mainIcon="🛡️" subLabel={currentTab.label} subIcon={currentTab.icon} />
-      {subTab === 'acreditacion'    && <AcreditacionSaldos rdbData={rdbData} periodo={periodo} />}
-      {subTab === 'sostenibilidad'  && <TabSostenibilidad rdbData={rdbData} periodo={periodo} sostId={sostId} rbdsContextoStr={rbdsContextoStr} esContextoAmpliado={esContextoAmpliado} />}
-      {subTab === 'hhi'             && <RenderHHISostenedor sostId={sostId} periodo={periodo} />}
-      {subTab === 'hhi_proveedores' && <RenderHHIProveedoresSostenedor sostId={sostId} periodo={periodo} />}
+      {subTab === 'acreditacion' && <AcreditacionSaldos rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'sostenibilidad' && <TabSostenibilidad rdbData={rdbData} periodo={periodo} />}
+      {subTab === 'hhi' && <RenderHHISostenedor sostId={sostId} periodo={periodo} />}
     </div>
   )
 }
@@ -550,8 +492,8 @@ function TabTerritorio({ data, periodo, sostId }) {
   }, [])
 
   const SUB_TABS = [
-    { key: 'complejidad', label: '1. Complejidad Educativa', icon: '🧩' },
-    { key: 'gasto', label: '3. Gasto Educativo', icon: '💰' },
+    { key: 'complejidad', label: 'Complejidad Educativa', icon: '🧩' },
+    { key: 'gasto', label: 'Gasto Educativo', icon: '💰' },
   ]
   const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
 
@@ -576,9 +518,8 @@ function TabComportamientoFinanciero({ periodo, sostId }) {
   }, [])
 
   const SUB_TABS = [
-    { key: 'gasto_rem', label: '9. Gastos Rem. sobre Ingreso Dep.', icon: '📈' },
-    { key: 'analisis_rendicion', label: '7. Análisis Rendición', icon: '📋' },
-    { key: 'proyeccion_saldos', label: '8. Proyección Saldos Iniciales', icon: '🔮' },
+    { key: 'gasto_rem', label: 'Gastos Rem. sobre Ingreso Dep.', icon: '📈' },
+    { key: 'analisis_rendicion', label: 'Análisis Rendición', icon: '📋' },
   ]
   const currentTab = SUB_TABS.find(t => t.key === subTab) || SUB_TABS[0]
 
@@ -593,11 +534,6 @@ function TabComportamientoFinanciero({ periodo, sostId }) {
       {subTab === 'analisis_rendicion' && (
         <WidgetWrapper widgetKey="cf_analisis_rendicion">
           <AnalisisRendicion sostId={sostId} periodo={periodo} />
-        </WidgetWrapper>
-      )}
-      {subTab === 'proyeccion_saldos' && (
-        <WidgetWrapper widgetKey="cf_proyeccion_saldos">
-          <ProyeccionSaldos sostId={sostId} periodo={periodo} />
         </WidgetWrapper>
       )}
     </div>
@@ -839,22 +775,16 @@ function renderWidgetContent(key, { rdbData, territorioData, periodo, sostId, lo
       return <TabRiesgo rdbData={rdbData} periodo={periodo} widgetFilter={key} />
     case 'sr_sostenibilidad_ratio':
     case 'sr_sostenibilidad_scatter':
-      return <TabSostenibilidad rdbData={rdbData} periodo={periodo} sostId={sostId} widgetFilter={key} />
+      return <TabSostenibilidad rdbData={rdbData} periodo={periodo} widgetFilter={key} />
     case 'sr_hhi_graficos':
     case 'sr_hhi_fuentes':
     case 'sr_hhi_detalle':
       return <RenderHHISostenedor sostId={sostId} periodo={periodo} widgetFilter={key} />
-    case 'sr_hhi_prov_graficos':
-    case 'sr_hhi_prov_composicion':
-    case 'sr_hhi_prov_detalle':
-      return <RenderHHIProveedoresSostenedor sostId={sostId} periodo={periodo} widgetFilter={key} />
     // ── Comportamiento Financiero ─────────────────────────────────────────────
     case 'cf_gasto_rem':
       return <GastoRemIngresoEstablecimiento sostId={sostId} periodo={periodo} />
     case 'cf_analisis_rendicion':
       return <AnalisisRendicion sostId={sostId} periodo={periodo} />
-    case 'cf_proyeccion_saldos':
-      return <ProyeccionSaldos sostId={sostId} periodo={periodo} />
     // ── Territorio ────────────────────────────────────────────────────────────
     case 'te_complejidad_prioridades':
     case 'te_complejidad_scatter':
